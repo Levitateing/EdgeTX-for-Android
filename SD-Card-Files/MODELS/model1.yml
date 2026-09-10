@@ -1,7 +1,7 @@
 semver: 3.0.0
 header: 
    name: "MODEL01"
-   bitmap: "801322.jpg"
+   bitmap: "178742.png"
    labels: ""
 telemetryProtocol: 0
 thrTrim: 0
@@ -94,7 +94,7 @@ expoData:
    mode: 3
    scale: 0
    trimSource: 0
-   srcRaw: "Rud"
+   srcRaw: "Ail"
    weight: 100
    offset: 0
    swtch: "NONE"
@@ -136,7 +136,7 @@ expoData:
    mode: 3
    scale: 0
    trimSource: 0
-   srcRaw: "Ail"
+   srcRaw: "Rud"
    weight: 100
    offset: 0
    swtch: "NONE"
@@ -146,6 +146,47 @@ expoData:
    chn: 3
    flightModes: 000000000
    name: ""
+flightModeData: 
+   0:
+      trim: 
+         5:
+            value: -128
+            mode: 0
+      name: ""
+      swtch: "NONE"
+      fadeIn: 0
+      fadeOut: 0
+      gvars: 
+         0:
+            val: 0
+         1:
+            val: 0
+         2:
+            val: 0
+         3:
+            val: 0
+         4:
+            val: 0
+         5:
+            val: 0
+         6:
+            val: 0
+         7:
+            val: 0
+         8:
+            val: 0
+         9:
+            val: 0
+         10:
+            val: 0
+         11:
+            val: 0
+         12:
+            val: 0
+         13:
+            val: 0
+         14:
+            val: 0
 thrTraceSrc: Thr
 switchWarning: 
    SA:
@@ -185,13 +226,13 @@ potsWarnMode: WARN_OFF
 jitterFilter: GLOBAL
 inputNames: 
    0:
-      val: "Rud"
+      val: "Ail"
    1:
       val: "Ele"
    2:
       val: "Thr"
    3:
-      val: "Ail"
+      val: "Rud"
 potsWarnEnabled: 0
 screenData: 
    0:

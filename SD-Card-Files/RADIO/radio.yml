@@ -1,4 +1,4 @@
-checksum: 16175
+checksum: 47357
 manuallyEdited: 0
 timezoneMinutes: 0
 ppmunit: 0
@@ -6,37 +6,41 @@ semver: 3.0.0
 board: android
 calib: 
    LH:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 1057
+      spanNeg: 674
+      spanPos: 683
    LV:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 1041
+      spanNeg: 733
+      spanPos: 681
    RV:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 1048
+      spanNeg: 739
+      spanPos: 723
    RH:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 1031
+      spanNeg: 740
+      spanPos: 708
    P1:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 1019
+      spanNeg: 1003
+      spanPos: 1010
    P2:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 773
+      spanNeg: 5388
+      spanPos: 9758
+   P3:
+      mid: 957
+      spanNeg: 943
+      spanPos: 1071
    SL1:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 1008
+      spanNeg: 705
+      spanPos: 544
    SL2:
-      mid: 1023
-      spanNeg: 1008
-      spanPos: 1008
+      mid: 1048
+      spanNeg: 658
+      spanPos: 647
    EXT1:
       mid: 1023
       spanNeg: 1008
@@ -45,14 +49,22 @@ calib:
       mid: 1023
       spanNeg: 1008
       spanPos: 1008
-vBatWarn: 74
+   EXT3:
+      mid: 1023
+      spanNeg: 1008
+      spanPos: 1008
+   EXT4:
+      mid: 1023
+      spanNeg: 1008
+      spanPos: 1008
+vBatWarn: 64
 txVoltageCalibration: 0
 backlightMode: backlight_mode_all
 antennaMode: MODE_PER_MODEL
-disableRtcWarning: 0
+disableRtcWarning: 1
 keysBacklight: 0
 dontPlayHello: 0
-internalModule: TYPE_CROSSFIRE
+internalModule: TYPE_MULTIMODULE
 trainer: 
    mix: 
       0:
@@ -77,16 +89,16 @@ beepMode: mode_all
 alarmsFlash: 0
 disableMemoryWarning: 0
 disableAlarmWarning: 0
-stickMode: 0
+stickMode: 1
 timezone: 0
 adjustRTC: 0
 inactivityTimer: 10
-internalModuleBaudrate: 1
+internalModuleBaudrate: 0
 splashMode: 2
 hapticMode: mode_nokeys
 switchesDelay: 0
 lightAutoOff: 2
-templateSetup: 0
+templateSetup: 21
 PPM_Multiplier: 0
 hapticLength: 2
 beepLength: 2
@@ -94,11 +106,11 @@ hapticStrength: 2
 gpsFormat: 0
 audioMuteEnable: 1
 speakerPitch: 0
-speakerVolume: 10
-vBatMin: 70
+speakerVolume: 12
+vBatMin: 60
 vBatMax: 86
-backlightBright: 57
-globalTimer: 0
+backlightBright: 0
+globalTimer: 4654
 bluetoothBaudrate: 0
 bluetoothMode: OFF
 countryCode: 0
@@ -107,7 +119,7 @@ pwrOffSpeed: 0
 noJitterFilter: 0
 imperial: 0
 disableRssiPoweroffAlarm: 0
-USBMode: 0
+USBMode: 3
 jackMode: 0
 ttsLanguage: "en"
 uiLanguage: "cn"
@@ -128,6 +140,10 @@ potsConfig:
       inv: 0
       name: ""
    P2:
+      type: multipos_switch
+      inv: 0
+      name: ""
+   P3:
       type: with_detent
       inv: 0
       name: ""
@@ -173,13 +189,13 @@ switchConfig:
    SW1:
       name: ""
       type: 2POS
-      start: START_PREVIOUS
+      start: START_OFF
       onColorLuaOverride: OFF
       offColorLuaOverride: OFF
       onColor: 
-         r: 255
-         g: 255
-         b: 255
+         r: 0
+         g: 0
+         b: 0
       offColor: 
          r: 0
          g: 0
@@ -187,69 +203,69 @@ switchConfig:
    SW2:
       name: ""
       type: 2POS
-      start: START_PREVIOUS
+      start: START_OFF
       onColorLuaOverride: OFF
       offColorLuaOverride: OFF
       onColor: 
-         r: 255
-         g: 255
-         b: 255
+         r: 0
+         g: 0
+         b: 0
       offColor: 
          r: 0
          g: 0
          b: 0
    SW3:
       name: ""
-      type: 2POS
-      start: START_PREVIOUS
+      type: NONE
+      start: START_OFF
       onColorLuaOverride: OFF
       offColorLuaOverride: OFF
       onColor: 
-         r: 255
-         g: 255
-         b: 255
+         r: 0
+         g: 0
+         b: 0
       offColor: 
          r: 0
          g: 0
          b: 0
    SW4:
       name: ""
-      type: 2POS
-      start: START_PREVIOUS
+      type: NONE
+      start: START_OFF
       onColorLuaOverride: OFF
       offColorLuaOverride: OFF
       onColor: 
-         r: 255
-         g: 255
-         b: 255
+         r: 0
+         g: 0
+         b: 0
       offColor: 
          r: 0
          g: 0
          b: 0
    SW5:
       name: ""
-      type: 2POS
-      start: START_PREVIOUS
+      type: NONE
+      start: START_OFF
       onColorLuaOverride: OFF
       offColorLuaOverride: OFF
       onColor: 
-         r: 255
-         g: 255
-         b: 255
+         r: 0
+         g: 0
+         b: 0
       offColor: 
          r: 0
          g: 0
          b: 0
    SW6:
       name: ""
-      type: 2POS
-      start: START_PREVIOUS
+      type: NONE
+      start: START_OFF
       onColorLuaOverride: OFF
       offColorLuaOverride: OFF
       onColor: 
-         r: 255
-         g: 255
-         b: 255
+         r: 0
+         g: 0
+         b: 0
       offColor: 
          r: 0
          g: 0
@@ -261,7 +277,7 @@ switchConfig:
       name: ""
       type: NONE
 currModelFilename: "model1.yml"
-blOffBright: 11
+blOffBright: 20
 bluetoothName: ""
 ownerRegistrationID: "-eC!U*U*"
 rotEncMode: 0
@@ -279,7 +295,7 @@ modelGVDisabled: 0
 volumeSrc: "NONE"
 modelLSDisabled: 0
 modelSFDisabled: 0
-modelCustomScriptsDisabled: -1
+modelCustomScriptsDisabled: 0
 modelTelemetryDisabled: 0
 disableTrainerPoweroffAlarm: 0
 disablePwrOnOffHaptic: 0
