@@ -382,7 +382,14 @@ edgetx/
 2. GUI 或命令行编译；字库异常则清理 + `-ForceAssets`  
 3. `versionName` 标注分辨率  
 4. 真机验证 UI + 模型保存 + 混控重启  
-5. **勿提交**：`.tools/`、`build-android-*`、`output/`、`jniLibs/*.a`、`.cxx/`  
+5. **勿提交：**
+
+   - `.tools/`
+   - `build-android-*`
+   - `output/`
+   - `jniLibs` 下的静态库（`.a`）
+   - `.cxx/`
+  
 
 ---
 
