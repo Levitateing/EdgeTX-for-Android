@@ -16,15 +16,79 @@ $p = Get-EdgeTxPaths
 $t = $p.ToolsDir
 $dest = Join-Path $t $pkgName
 $gcc = Join-Path $dest "bin\arm-none-eabi-gcc.exe"
+$gxx = Join-Path $dest "bin\arm-none-eabi-g++.exe"
 
 function Write-ArmLog([string]$msg) {
     if ($OnLog) { Write-BuildLog $msg $OnLog } else { Write-Host $msg }
+}
+
+function Repair-ArmGccLibstdcxxBits([string]$ToolchainRoot) {
+    # On Windows, arm-none-eabi-g++ can open multilib bits/c++config.h under
+    # paths like .../thumb/v7e-m+fp/hard/, but later #include <bits/os_defines.h>
+    # from that same tree fails (path segment '+'). Mirror multilib bits/*.h into
+    # the primary c++/<ver>/bits/ so includes resolve.
+    $cxxRoot = Join-Path $ToolchainRoot "arm-none-eabi\include\c++"
+    if (-not (Test-Path -LiteralPath $cxxRoot)) { return 0 }
+    $verDirs = @(Get-ChildItem -LiteralPath $cxxRoot -Directory -ErrorAction SilentlyContinue)
+    $copied = 0
+    foreach ($verDir in $verDirs) {
+        $mainBits = Join-Path $verDir.FullName "bits"
+        if (-not (Test-Path -LiteralPath $mainBits)) {
+            New-Item -ItemType Directory -Force -Path $mainBits | Out-Null
+        }
+        $multiBitsDirs = @(Get-ChildItem -LiteralPath $verDir.FullName -Directory -Recurse -Filter "bits" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -ne $mainBits -and $_.FullName -match '\\arm-none-eabi\\' })
+        foreach ($mb in $multiBitsDirs) {
+            Get-ChildItem -LiteralPath $mb.FullName -File -ErrorAction SilentlyContinue | ForEach-Object {
+                $dst = Join-Path $mainBits $_.Name
+                if (-not (Test-Path -LiteralPath $dst)) {
+                    Copy-Item -LiteralPath $_.FullName -Destination $dst -Force
+                    $copied++
+                }
+            }
+        }
+    }
+    return $copied
+}
+
+function Test-ArmGccLibstdcxx([string]$GxxPath) {
+    if (-not (Test-Path -LiteralPath $GxxPath)) { return $false }
+    $tmpCpp = Join-Path $env:TEMP ("arm-gcc-cxx-check-{0}.cpp" -f [guid]::NewGuid().ToString("N"))
+    $tmpObj = "$tmpCpp.o"
+    try {
+        Set-Content -Path $tmpCpp -Value "#include <cstdlib>`nint main(){return 0;}`n" -Encoding ASCII
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & $GxxPath -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -c $tmpCpp -o $tmpObj 2>$null | Out-Null
+            return ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $tmpObj))
+        } finally {
+            $ErrorActionPreference = $prev
+        }
+    } finally {
+        Remove-Item -LiteralPath $tmpCpp, $tmpObj -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Ensure-ArmGccReady([string]$ToolchainRoot, [string]$GxxPath) {
+    $n = Repair-ArmGccLibstdcxxBits -ToolchainRoot $ToolchainRoot
+    if ($n -gt 0) {
+        Write-ArmLog "Repaired libstdc++ bits headers for Windows multilib paths ($n file(s))."
+    }
+    if (-not (Test-ArmGccLibstdcxx -GxxPath $GxxPath)) {
+        throw @"
+arm-none-eabi-g++ cannot compile a trivial C++ file (missing bits/os_defines.h or similar).
+Delete the toolchain folder and re-run with -Force:
+  $ToolchainRoot
+"@
+    }
 }
 
 if ((Test-Path $gcc) -and -not $Force) {
     Write-ArmLog "Arm GNU Toolchain already present:"
     Write-ArmLog "  $gcc"
     & $gcc --version | Select-Object -First 2 | ForEach-Object { Write-ArmLog "$_" }
+    Ensure-ArmGccReady -ToolchainRoot $dest -GxxPath $gxx
     exit 0
 }
 
@@ -45,8 +109,16 @@ if ($zipSize -lt 100MB) {
 if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $extract | Out-Null
 Write-ArmLog "Extracting ..."
-# Official zip lays out bin/ + arm-none-eabi/ at archive root (no versioned wrapper).
-Expand-Archive -Path $zip -DestinationPath $extract -Force
+# Prefer tar: Expand-Archive is slower and more fragile on deep Windows paths.
+$tar = Get-Command tar.exe -ErrorAction SilentlyContinue
+if ($tar) {
+    & tar.exe -xf $zip -C $extract
+    if ($LASTEXITCODE -ne 0) {
+        throw "tar extract failed (exit $LASTEXITCODE)"
+    }
+} else {
+    Expand-Archive -Path $zip -DestinationPath $extract -Force
+}
 Remove-Item $zip -Force -ErrorAction SilentlyContinue
 
 if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
@@ -71,6 +143,8 @@ Get-ChildItem $t -Filter "arm-gcc-download*.zip" -ErrorAction SilentlyContinue |
 if (-not (Test-Path $gcc)) {
     throw "arm-none-eabi-gcc.exe missing after extract: $gcc"
 }
+
+Ensure-ArmGccReady -ToolchainRoot $dest -GxxPath $gxx
 
 Write-ArmLog ""
 Write-ArmLog "Installed to: $dest"
