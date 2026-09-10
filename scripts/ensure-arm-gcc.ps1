@@ -1,7 +1,8 @@
 # Install Arm GNU Toolchain (arm-none-eabi) into radio/src/targets/android/.tools
 # Used to build PCB=ANDROID radio firmware (e.g. ANDROID_HW=TX16S).
 param(
-    [switch]$Force
+    [switch]$Force,
+    [scriptblock]$OnLog
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,10 +17,14 @@ $t = $p.ToolsDir
 $dest = Join-Path $t $pkgName
 $gcc = Join-Path $dest "bin\arm-none-eabi-gcc.exe"
 
+function Write-ArmLog([string]$msg) {
+    if ($OnLog) { Write-BuildLog $msg $OnLog } else { Write-Host $msg }
+}
+
 if ((Test-Path $gcc) -and -not $Force) {
-    Write-Host "Arm GNU Toolchain already present:"
-    Write-Host "  $gcc"
-    & $gcc --version | Select-Object -First 2
+    Write-ArmLog "Arm GNU Toolchain already present:"
+    Write-ArmLog "  $gcc"
+    & $gcc --version | Select-Object -First 2 | ForEach-Object { Write-ArmLog "$_" }
     exit 0
 }
 
@@ -28,25 +33,18 @@ $stamp = Get-Date -Format "yyyyMMddHHmmss"
 $zip = Join-Path $t "$pkgName.$stamp.zip"
 $extract = Join-Path $t "_extract_arm_gcc_$stamp"
 
-Write-Host "Downloading Arm GNU Toolchain $ver (~300+ MB) ..."
-Write-Host "  $url"
-Write-Host "  -> $zip"
-
-$curl = Get-Command curl.exe -ErrorAction SilentlyContinue
-if (-not $curl) { throw "curl.exe not found (required for reliable large download)" }
-
-& curl.exe -L --retry 3 --retry-delay 2 --fail -o $zip $url
-if ($LASTEXITCODE -ne 0) { throw "curl download failed: $LASTEXITCODE" }
+Write-ArmLog "Downloading Arm GNU Toolchain $ver (~300+ MB) ..."
+Invoke-DownloadFileWithProgress -Url $url -OutFile $zip -OnLog $OnLog
 
 $zipSize = (Get-Item $zip).Length
-Write-Host ("Downloaded {0:N1} MB" -f ($zipSize / 1MB))
+Write-ArmLog ("Downloaded {0:N1} MB" -f ($zipSize / 1MB))
 if ($zipSize -lt 100MB) {
     throw "Download looks truncated ($zipSize bytes). Delete $zip and retry."
 }
 
 if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $extract | Out-Null
-Write-Host "Extracting ..."
+Write-ArmLog "Extracting ..."
 # Official zip lays out bin/ + arm-none-eabi/ at archive root (no versioned wrapper).
 Expand-Archive -Path $zip -DestinationPath $extract -Force
 Remove-Item $zip -Force -ErrorAction SilentlyContinue
@@ -74,8 +72,9 @@ if (-not (Test-Path $gcc)) {
     throw "arm-none-eabi-gcc.exe missing after extract: $gcc"
 }
 
-Write-Host ""
-Write-Host "Installed to: $dest"
-& $gcc --version | Select-Object -First 3
-Write-Host ""
-Write-Host "build-android-radio.ps1 will pick this up automatically from .tools"
+Write-ArmLog ""
+Write-ArmLog "Installed to: $dest"
+& $gcc --version | Select-Object -First 3 | ForEach-Object { Write-ArmLog "$_" }
+Write-ArmLog ""
+Write-ArmLog "Add to PATH for this shell:"
+Write-ArmLog ("  `$env:Path = `"{0}\bin;`$env:Path`"" -f $dest)

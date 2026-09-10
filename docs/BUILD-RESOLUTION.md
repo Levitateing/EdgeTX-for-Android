@@ -54,7 +54,7 @@
 **[1] 环境检查**
 
 - 列出 Python、CMake、NDK、JDK、resvg、lv_font_conv 等 12 项
-- **Install missing**：弹窗确认后下载到 `.tools`（首次 NDK 约 1.5 GB）；Python 本体需事先安装
+- **Install missing**（可选）：后台下载到 `.tools`，日志显示进度；大件更建议按 [TOOLCHAIN.md](TOOLCHAIN.md) 自行安装。Python 本体需事先安装。
 
 **[2] 已预编译资源**（原「预设」）
 

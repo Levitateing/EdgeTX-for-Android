@@ -37,16 +37,16 @@ $script:Strings = @{
         ColArtifact       = "Artifact"
         StatusOk          = "OK"
         StatusMissing     = "MISSING"
-        ToolsHint         = "Radio build needs ARM GCC + CMake + Ninja (+ Python/libclang for codegen). Tools go under .tools."
+        ToolsHint         = "Prefer installing tools yourself (docs/TOOLCHAIN.md). Optional Install missing runs in background; watch the log."
         BoardHint         = "TX16S = F429 trial radio. H750 = MK3-class — do NOT flash H750 firmware to F429. Output is staged next to EdgeTX.apk."
         LogReady          = "Radio firmware wizard ready."
         LogToolsDir       = "Tools dir: {0}"
-        LogMissingInit    = "{0} missing item(s) — use Install missing."
+        LogMissingInit    = "{0} missing item(s) — install yourself (TOOLCHAIN.md) or use Install missing."
         LogEnvOk          = "Environment OK. Select a board and Start build."
         LogEnvCheck       = "=== Environment check ==="
         LogAllReady       = "All required tools ready."
-        LogMissingItems   = "{0} item(s) missing. Click Install missing."
-        LogInstallStart   = "=== Installing missing tools ==="
+        LogMissingItems   = "{0} item(s) missing. Install yourself or click Install missing."
+        LogInstallStart   = "=== Installing missing tools (background) ==="
         LogInstallDone    = "=== Install pass finished ==="
         LogInstallFailed  = "Install failed: {0}"
         LogBuildStart     = "=== Radio build start {0} @ {1} ==="
@@ -54,7 +54,7 @@ $script:Strings = @{
         LogFailed         = "=== Build FAILED (exit {0}) ==="
         MsgNothingInstall = "Nothing to install."
         MsgInstallTitle   = "Confirm install"
-        MsgInstallBody    = "The following will be downloaded into radio\src\targets\android\.tools (or pip):`n`n{0}`n`nContinue?"
+        MsgInstallBody    = "Preferred: install yourself (docs/TOOLCHAIN.md).`n`nOptional one-click into .tools (or pip):`n`n{0}`n`nProgress is logged below. Continue?"
         MsgCannotBuild    = "{0} required tool(s) missing. Install them first."
         MsgNoBoard        = "Select a board from the list first."
         MsgBuildTitle     = "Confirm build"
@@ -103,16 +103,16 @@ Continue?
         ColArtifact       = "产物状态"
         StatusOk          = "OK"
         StatusMissing     = "缺失"
-        ToolsHint         = "遥控固件需要 ARM GCC + CMake + Ninja（以及 Python/libclang 做代码生成）。工具安装到 .tools。"
+        ToolsHint         = "建议自行安装（见 docs/TOOLCHAIN.md）。也可「安装缺失项」后台下载到 .tools，进度见日志。"
         BoardHint         = "TX16S = F429 试验机。H750 = MK3 类 —— 切勿把 H750 固件刷进 F429。产物与 EdgeTX.apk 同目录。"
         LogReady          = "遥控固件编译向导已就绪。"
         LogToolsDir       = "工具目录: {0}"
-        LogMissingInit    = "缺少 {0} 项 — 请点「安装缺失项」。"
+        LogMissingInit    = "缺少 {0} 项 — 请自行安装（TOOLCHAIN.md）或点「安装缺失项」。"
         LogEnvOk          = "环境正常。选择板型后点「开始编译」。"
         LogEnvCheck       = "=== 环境检测 ==="
         LogAllReady       = "所需工具已就绪。"
-        LogMissingItems   = "缺少 {0} 项。请点「安装缺失项」。"
-        LogInstallStart   = "=== 开始安装缺失工具 ==="
+        LogMissingItems   = "缺少 {0} 项。请自行安装或点「安装缺失项」。"
+        LogInstallStart   = "=== 开始安装缺失工具（后台） ==="
         LogInstallDone    = "=== 安装流程结束 ==="
         LogInstallFailed  = "安装失败: {0}"
         LogBuildStart     = "=== 开始编译 {0} @ {1} ==="
@@ -120,7 +120,7 @@ Continue?
         LogFailed         = "=== 编译失败 (exit {0}) ==="
         MsgNothingInstall = "没有需要安装的项目。"
         MsgInstallTitle   = "确认安装"
-        MsgInstallBody    = "将下载到 radio\src\targets\android\.tools（或 pip）：`n`n{0}`n`n继续？"
+        MsgInstallBody    = "建议按 docs/TOOLCHAIN.md 自行安装。`n`n也可一键下载到 .tools（或 pip）：`n`n{0}`n`n进度在下方日志。是否继续？"
         MsgCannotBuild    = "缺少 {0} 项必需工具，请先安装。"
         MsgNoBoard        = "请先在列表中选择板型。"
         MsgBuildTitle     = "确认编译"
@@ -527,25 +527,45 @@ $btnInstall.Add_Click({
     if ($r -ne "Yes") { return }
 
     Set-Busy $true
-    try {
-        Append-Log (T "LogInstallStart")
-        foreach ($t in $missing) {
-            Append-Log ">>> $($t.Name)"
-            if ($t.Id -eq "armgcc") {
-                $ens = Join-Path $PSScriptRoot "ensure-arm-gcc.ps1"
-                & $ens 2>&1 | ForEach-Object { Append-Log "$_" }
-            } else {
-                Install-EdgeTxTool -ToolId $t.Id -OnLog { param($m) Append-Log $m }
-            }
-        }
-        Append-Log (T "LogInstallDone")
-        Update-ToolList
-    } catch {
-        Append-Log ((T "LogInstallFailed") -f $_.Exception.Message)
-        Show-GuiMessageBox ($_.Exception.Message) ((T "MsgInstallFailed")) ("OK") ("Error") | Out-Null
-    } finally {
-        Set-Busy $false
+    Append-Log (T "LogInstallStart")
+    $ids = ($missing | ForEach-Object { $_.Id }) -join ","
+    $envLib = (Join-Path $PSScriptRoot "lib\BuildEnvironment.ps1").Replace("'", "''")
+    $armScript = (Join-Path $PSScriptRoot "ensure-arm-gcc.ps1").Replace("'", "''")
+    $jobBody = @"
+. '$envLib'
+`$ids = '$ids'.Split(',') | Where-Object { `$_ }
+try {
+  foreach (`$id in `$ids) {
+    Write-GuiJobLog (">>> Installing " + `$id)
+    if (`$id -eq 'armgcc') {
+      & '$armScript' -OnLog { param(`$m) Write-GuiJobLog `$m }
+    } else {
+      Install-EdgeTxTool -ToolId `$id -OnLog { param(`$m) Write-GuiJobLog `$m }
     }
+  }
+  Write-GuiJobLog 'INSTALL_OK'
+  exit 0
+} catch {
+  Write-GuiJobLog (`$_.Exception.Message)
+  exit 1
+}
+"@
+    Start-GuiPowerShellJob -ScriptText $jobBody -WorkingDirectory $paths.AndroidRoot `
+        -OnLogLine { param($line) Append-Log $line } `
+        -OnExit {
+            param($code)
+            try {
+                if ($code -ne 0) {
+                    Append-Log ((T "LogInstallFailed") -f "exit $code")
+                    Show-GuiMessageBox ("Install failed (exit $code). See log.") ((T "MsgInstallFailed")) ("OK") ("Error") | Out-Null
+                } else {
+                    Append-Log (T "LogInstallDone")
+                    Update-ToolList
+                }
+            } finally {
+                Set-Busy $false
+            }
+        } | Out-Null
 })
 
 $btnOpenOut.Add_Click({
@@ -569,7 +589,7 @@ function Start-RadioBuild {
 
     $hwTag = $hw.ToLower()
     $confirm = (T "MsgBuildBody") -f $hw, $hwTag
-    if (Show-GuiMessageBox ($confirm) ((T "MsgBuildTitle")) ("YesNo") ("Question") -ne "Yes") {
+    if ((Show-GuiMessageBox ($confirm) ((T "MsgBuildTitle")) ("YesNo") ("Question")) -ne "Yes") {
         return
     }
 

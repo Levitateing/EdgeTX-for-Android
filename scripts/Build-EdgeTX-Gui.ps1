@@ -33,19 +33,19 @@ $script:Strings = @{
         StatusMissing     = "MISSING"
         StatusPartial     = "PARTIAL"
         StatusStock       = "stock"
-        ToolsHint         = "Downloads go to radio\src\targets\android\.tools only. System Python/JDK may be reused."
+        ToolsHint         = "Prefer installing tools yourself (see docs/TOOLCHAIN.md). Optional one-click Install missing runs in the background; watch the log for download progress."
         ResHint           = "Select a resolution, then Start build. Right-click a row to delete (800x480 is protected)."
         LblWidth          = "Width:"
         LblHeight         = "Height:"
         AssetNeedGen      = "Assets will be generated at configure (first run is slow)."
         LogReady          = "EdgeTX Android build wizard ready."
         LogToolsDir       = "Tools dir: {0}"
-        LogMissingInit    = "{0} missing item(s) - use Install missing."
+        LogMissingInit    = "{0} missing item(s) - install yourself (TOOLCHAIN.md) or use Install missing."
         LogEnvOk          = "Environment OK. Select a resolution and Start build."
         LogEnvCheck       = "=== Environment check ==="
         LogAllReady       = "All required tools ready."
-        LogMissingItems   = "{0} item(s) missing. Click Install missing."
-        LogInstallStart   = "=== Installing missing tools ==="
+        LogMissingItems   = "{0} item(s) missing. Install yourself or click Install missing."
+        LogInstallStart   = "=== Installing missing tools (background) ==="
         LogInstallDone    = "=== Install pass finished ==="
         LogInstallFailed  = "Install failed: {0}"
         LogBuildStart     = "EdgeTX build started - {0}"
@@ -62,7 +62,7 @@ $script:Strings = @{
         LogResScan        = "=== Display assets scan ==="
         MsgNothingInstall = "Nothing to install."
         MsgInstallTitle   = "Confirm install"
-        MsgInstallBody    = "The following will be downloaded into radio\src\targets\android\.tools (or pip):`n`n{0}`n`nNDK is ~1.5 GB. Continue?"
+        MsgInstallBody    = "Preferred: install large tools yourself (see docs/TOOLCHAIN.md).`n`nOptional one-click downloads into radio\src\targets\android\.tools (or pip):`n`n{0}`n`nNDK ~1.5 GB. UI stays responsive; watch the log for progress. Continue?"
         MsgCannotBuild    = "{0} required tool(s) missing. Install them first."
         MsgResTitle       = "Resolution"
         MsgNoSelection    = "Select a resolution from the list first."
@@ -127,19 +127,19 @@ This cannot be undone.
         StatusMissing     = "缺失"
         StatusPartial     = "不完整"
         StatusStock       = "原始"
-        ToolsHint         = "下载内容仅保存到 radio\src\targets\android\.tools。可复用系统已安装的 Python/JDK。"
+        ToolsHint         = "建议自行安装工具链（见 docs/TOOLCHAIN.md）。也可点「安装缺失项」后台下载到 .tools，进度见下方日志。"
         ResHint           = "选择列表中的分辨率后点击 [开始编译]。右键可删除 (800x480 为原始资源，禁止删除)。"
         LblWidth          = "宽度:"
         LblHeight         = "高度:"
         AssetNeedGen      = "首次配置时将自动生成资源 (较慢)。"
         LogReady          = "EdgeTX Android 编译向导已就绪。"
         LogToolsDir       = "工具目录: {0}"
-        LogMissingInit    = "有 {0} 项缺失 - 请使用 [安装缺失项]。"
+        LogMissingInit    = "有 {0} 项缺失 — 请自行安装（TOOLCHAIN.md）或使用「安装缺失项」。"
         LogEnvOk          = "环境就绪。请选择分辨率后点击 [开始编译]。"
         LogEnvCheck       = "=== 环境检测 ==="
         LogAllReady       = "所有必需工具已就绪。"
-        LogMissingItems   = "有 {0} 项缺失，请点击 [安装缺失项]。"
-        LogInstallStart   = "=== 正在安装缺失工具 ==="
+        LogMissingItems   = "有 {0} 项缺失，请自行安装或点击「安装缺失项」。"
+        LogInstallStart   = "=== 正在安装缺失工具（后台） ==="
         LogInstallDone    = "=== 安装阶段完成 ==="
         LogInstallFailed  = "安装失败: {0}"
         LogBuildStart     = "开始编译 EdgeTX - {0}"
@@ -156,7 +156,7 @@ This cannot be undone.
         LogResScan        = "=== 资源扫描 ==="
         MsgNothingInstall = "没有需要安装的项目。"
         MsgInstallTitle   = "确认安装"
-        MsgInstallBody    = "以下内容将下载到 radio\src\targets\android\.tools (或通过 pip 安装):`n`n{0}`n`nNDK 约 1.5 GB。是否继续？"
+        MsgInstallBody    = "建议大件（JDK/SDK/NDK）按 docs/TOOLCHAIN.md 自行安装。`n`n也可一键下载到 radio\src\targets\android\.tools（或 pip）：`n`n{0}`n`nNDK 约 1.5 GB。界面不卡死，进度在日志中显示。是否继续？"
         MsgCannotBuild    = "有 {0} 个必需工具缺失，请先安装。"
         MsgResTitle       = "分辨率"
         MsgNoSelection    = "请先在列表中选择一个分辨率。"
@@ -355,12 +355,21 @@ $form.Controls.AddRange(@(
     $lblSection3, $txtLog, $progress, $btnBuild, $btnClose
 ))
 
+function Append-GuiLog([string]$line) {
+    $box = $txtLog
+    if ($null -eq $box -or $box.IsDisposed) { return }
+    if ($box.InvokeRequired) {
+        [void]$box.BeginInvoke([Action[string]] { param($s) Append-GuiLog $s }, $line)
+        return
+    }
+    $box.AppendText("$line`r`n")
+    $box.SelectionStart = $box.Text.Length
+    $box.ScrollToCaret()
+}
+
 $script:LogBlock = {
     param($line)
-    $txtLog.AppendText("$line`r`n")
-    $txtLog.SelectionStart = $txtLog.Text.Length
-    $txtLog.ScrollToCaret()
-    [System.Windows.Forms.Application]::DoEvents()
+    Append-GuiLog $line
 }
 
 $script:BuildProgressTimer = New-Object System.Windows.Forms.Timer
@@ -639,15 +648,38 @@ $btnInstall.Add_Click({
     if ($r -ne "Yes") { return }
 
     Set-Busy $true
-    try {
-        & $script:LogBlock (T "LogInstallStart")
-        Install-EdgeTxMissingTools -OnLog $script:LogBlock
-        Update-ToolList
-        & $script:LogBlock (T "LogInstallDone")
-    } catch {
-        & $script:LogBlock ((T "LogInstallFailed") -f $_.Exception.Message)
-        Show-GuiMessageBox ($_.Exception.Message) ((T "MsgInstallFailed")) ("OK") ("Error") | Out-Null
-    } finally { Set-Busy $false }
+    & $script:LogBlock (T "LogInstallStart")
+    $envLib = (Join-Path $PSScriptRoot "lib\BuildEnvironment.ps1").Replace("'", "''")
+    $jobBody = @"
+. '$envLib'
+try {
+  Install-EdgeTxMissingTools -OnLog {
+    param(`$m)
+    Write-GuiJobLog `$m
+  }
+  Write-GuiJobLog 'INSTALL_OK'
+  exit 0
+} catch {
+  Write-GuiJobLog (`$_.Exception.Message)
+  exit 1
+}
+"@
+    Start-GuiPowerShellJob -ScriptText $jobBody -WorkingDirectory $paths.AndroidRoot `
+        -OnLogLine { param($line) & $script:LogBlock $line } `
+        -OnExit {
+            param($code)
+            try {
+                if ($code -ne 0) {
+                    & $script:LogBlock ((T "LogInstallFailed") -f "exit $code")
+                    Show-GuiMessageBox ("Install failed (exit $code). See log.") ((T "MsgInstallFailed")) ("OK") ("Error") | Out-Null
+                } else {
+                    Update-ToolList
+                    & $script:LogBlock (T "LogInstallDone")
+                }
+            } finally {
+                Set-Busy $false
+            }
+        } | Out-Null
 })
 
 $btnBuild.Add_Click({

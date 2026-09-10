@@ -48,10 +48,10 @@ git submodule add <your-fork-url> radio/src/targets/android
 
 ## 4. 首次编译 APK
 
-1. **先安装 [Python 3](https://www.python.org/downloads/)**（勾选 Add to PATH）。`.pyw` 依赖本机 Python；「安装缺失项」会装 pip 包与 `.tools/`，**不会**装 Python 本体。  
-2. 进入 `radio/src/targets/android/`  
-3. 双击 **`Build-EdgeTX-GUI.pyw`**  
-4. 点击安装缺失工具（Pillow/libclang 走 pip；JDK / SDK / NDK / CMake / resvg 等进 `.tools/`，约数 GB）  
+1. **先安装 [Python 3](https://www.python.org/downloads/)**（勾选 Add to PATH）。  
+2. **建议按 [TOOLCHAIN.md](TOOLCHAIN.md) 自行安装** JDK 17、Android SDK/NDK、CMake、Ninja 等（更快更稳）。  
+3. 进入 `radio/src/targets/android/`  
+4. 双击 **`Build-EdgeTX-GUI.pyw`**，做环境检查。缺项可点「安装缺失项」（**后台下载**，进度在日志中；NDK 仍可能很久）。  
 5. 默认分辨率 **2400×1440**，开始编译  
 6. 产物：`output/EdgeTX.apk`（arm64-v8a）
 

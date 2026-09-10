@@ -81,7 +81,7 @@ powershell -NoProfile -File scripts\build-android-radio.ps1 -Hw TX16S
 | `ensure-wallpaper-gui-utf8.ps1` | 同上，壁纸 GUI。 |
 | `validate-paths.ps1` | 校验平台路径、关键补丁是否存在。 |
 
-GUI 里的「安装缺失项」会按需调用上述 ensure 脚本。
+GUI 里的「安装缺失项」为可选（后台子进程 + 日志进度）；**更推荐**按 [TOOLCHAIN.md](TOOLCHAIN.md) 自行安装。一键安装会按需调用上述 ensure 脚本。
 
 ---
 

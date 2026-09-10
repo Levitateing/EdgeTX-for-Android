@@ -40,7 +40,6 @@ firmware/patches/<相对 EdgeTX 根的路径>
 - `radio/src/edgetx.cpp`
 - `radio/src/edgetx.h`
 - `radio/src/gvars.h`
-- `radio/src/haptic.cpp`
 - `radio/src/main.cpp`
 - `radio/src/model_init.cpp`
 

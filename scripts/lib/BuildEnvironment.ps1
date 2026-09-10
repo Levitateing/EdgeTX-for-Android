@@ -97,6 +97,108 @@ function Write-BuildLog {
     if ($OnLog) { & $OnLog $line } else { Write-Host $line }
 }
 
+function Invoke-DownloadFileWithProgress {
+    param(
+        [Parameter(Mandatory = $true)][string]$Url,
+        [Parameter(Mandatory = $true)][string]$OutFile,
+        [scriptblock]$OnLog,
+        [int]$ProgressStepPercent = 5,
+        [double]$ProgressIntervalSec = 2.0
+    )
+    $dir = Split-Path -Parent $OutFile
+    if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    if (Test-Path -LiteralPath $OutFile) { Remove-Item -LiteralPath $OutFile -Force }
+
+    Write-BuildLog "Downloading: $Url" $OnLog
+    Write-BuildLog "  -> $OutFile" $OnLog
+
+    # Prefer HttpClient: reliable file write + percent progress (curl ProcessStartInfo
+    # quoting is fragile on Windows and redirected stdio can exit with no file).
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    } catch { }
+
+    Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    $handler.AllowAutoRedirect = $true
+    $client = New-Object System.Net.Http.HttpClient $handler
+    $client.Timeout = [TimeSpan]::FromHours(3)
+    $client.DefaultRequestHeaders.UserAgent.ParseAdd("EdgeTX-Android-Build/1.0")
+    try {
+        $response = $client.GetAsync($Url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+        if (-not $response.IsSuccessStatusCode) {
+            throw "HTTP $([int]$response.StatusCode) $($response.ReasonPhrase)"
+        }
+        $total = $response.Content.Headers.ContentLength
+        if ($total) {
+            Write-BuildLog ("  size: {0:N1} MB" -f ($total / 1MB)) $OnLog
+        }
+        $inStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $outStream = [System.IO.File]::Create($OutFile)
+        try {
+            $buffer = New-Object byte[] (256KB)
+            $totalRead = 0L
+            $lastPct = -1
+            $lastLog = Get-Date
+            while (($n = $inStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                $outStream.Write($buffer, 0, $n)
+                $totalRead += $n
+                $now = Get-Date
+                if ($total -and $total -gt 0) {
+                    $pct = [int]([Math]::Floor(100.0 * $totalRead / $total))
+                    if ($pct -ge ($lastPct + $ProgressStepPercent) -or ($now - $lastLog).TotalSeconds -ge $ProgressIntervalSec) {
+                        Write-BuildLog ("  ... {0}% ({1:N1} / {2:N1} MB)" -f $pct, ($totalRead / 1MB), ($total / 1MB)) $OnLog
+                        $lastPct = $pct
+                        $lastLog = $now
+                    }
+                } elseif (($now - $lastLog).TotalSeconds -ge $ProgressIntervalSec) {
+                    Write-BuildLog ("  ... downloaded {0:N1} MB" -f ($totalRead / 1MB)) $OnLog
+                    $lastLog = $now
+                }
+            }
+            $outStream.Flush()
+        } finally {
+            $outStream.Dispose()
+            $inStream.Dispose()
+            $response.Dispose()
+        }
+    } catch {
+        if (Test-Path -LiteralPath $OutFile) {
+            Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
+        }
+        throw "Download failed: $($_.Exception.Message)"
+    } finally {
+        $client.Dispose()
+        $handler.Dispose()
+    }
+
+    if (-not (Test-Path -LiteralPath $OutFile)) {
+        throw "Download finished but file missing: $OutFile"
+    }
+    $final = (Get-Item -LiteralPath $OutFile).Length
+    if ($final -le 0) {
+        Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
+        throw "Download produced empty file: $OutFile"
+    }
+    Write-BuildLog ("Download complete: {0:N1} MB" -f ($final / 1MB)) $OnLog
+}
+
+function Invoke-DownloadAndExpand {
+    param(
+        [string]$Url,
+        [string]$ZipPath,
+        [string]$ExtractDir,
+        [scriptblock]$OnLog
+    )
+    Invoke-DownloadFileWithProgress -Url $Url -OutFile $ZipPath -OnLog $OnLog
+    Write-BuildLog "Extracting: $ZipPath" $OnLog
+    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $ExtractDir | Out-Null
+    Expand-Archive -Path $ZipPath -DestinationPath $ExtractDir -Force
+    Remove-Item $ZipPath -Force -ErrorAction SilentlyContinue
+    Write-BuildLog "Extract done: $ExtractDir" $OnLog
+}
+
 function Test-PythonModule {
     param([string]$ModuleName)
     try {
@@ -466,22 +568,6 @@ function Invoke-EdgeTxBuildScript {
     }
 }
 
-function Invoke-DownloadAndExpand {
-    param(
-        [string]$Url,
-        [string]$ZipPath,
-        [string]$ExtractDir,
-        [scriptblock]$OnLog
-    )
-    New-Item -ItemType Directory -Force -Path (Split-Path $ZipPath) | Out-Null
-    Write-BuildLog "Downloading: $Url" $OnLog
-    Invoke-WebRequest -Uri $Url -OutFile $ZipPath -UseBasicParsing
-    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $ExtractDir | Out-Null
-    Expand-Archive -Path $ZipPath -DestinationPath $ExtractDir -Force
-    Remove-Item $ZipPath -Force -ErrorAction SilentlyContinue
-}
-
 function Install-EdgeTxTool {
     param(
         [string]$ToolId,
@@ -564,11 +650,11 @@ function Install-EdgeTxTool {
             return
         }
         "resvg" {
-            & (Join-Path $script:AppRoot "scripts\ensure-resvg.ps1")
+            & (Join-Path $script:AppRoot "scripts\ensure-resvg.ps1") -OnLog $OnLog
             return
         }
         "fonttools" {
-            & (Join-Path $script:AppRoot "scripts\ensure-font-tools.ps1")
+            & (Join-Path $script:AppRoot "scripts\ensure-font-tools.ps1") -OnLog $OnLog
             return
         }
         default { throw "Unknown tool id: $ToolId" }
@@ -603,7 +689,7 @@ function Install-EdgeTxAndroidSdk {
     $env:ANDROID_SDK_ROOT = $sdk
     $env:ANDROID_HOME = $sdk
     Write-BuildLog "sdkmanager: $($ComponentsOnly -join ', ')" $OnLog
-    Write-BuildLog "NDK download ~1.5 GB; please wait..." $OnLog
+    Write-BuildLog "Large packages (esp. NDK ~1.5 GB) may take a long time; progress lines from sdkmanager follow..." $OnLog
 
     $yes = "y`n" * 20
     $yes | & $cmdTools --sdk_root=$sdk @ComponentsOnly 2>&1 | ForEach-Object {

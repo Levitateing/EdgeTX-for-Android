@@ -10,7 +10,7 @@
 
 **兼容基线（EdgeTX）：** [`96ab274`](https://github.com/EdgeTX/edgetx/commit/96ab2745d1bc0025c5508ac8a3b862f34cf97c6e)  
 
-本项目在 Windows 11 环境下开发；**全部代码由 AI 生成**，仅供学习交流。使用、刷机与飞行风险自负；本人不对任何非正常情况负责。
+本项目在 Windows 11 环境下开发；**全部代码由 AI 生成**，仅供学习交流。本人不对任何非正常情况负责。
 
 ---
 
@@ -34,14 +34,14 @@ cd radio/src/targets/android
 
 ### GUI 工具
 
-**请先安装 [Python 3](https://www.python.org/downloads/)**（勾选 Add to PATH）。`.pyw` 依赖本机 Python。「安装缺失项」会自动装 Pillow / libclang / lz4（pip）以及 JDK / SDK / NDK / CMake 等（进 `.tools/`）；**不会**自动安装 Python 本体。
+**请先安装 [Python 3](https://www.python.org/downloads/)**（勾选 Add to PATH）。其余工具链**建议自行安装**（清单与下载见 [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md)）。
 
 | 双击启动 | 作用 |
 |----------|------|
 | **`Build-EdgeTX-GUI.pyw`** | 编 **Android APK**：检查/安装工具链、选分辨率、一键编译 → `output/EdgeTX.apk` |
 | **`Build-Radio-GUI.pyw`** | 编 **遥控器固件**（试验板 TX16S / H750）：安装 ARM GCC 等 → `output/firmware-*.bin` |
 
-首次编 APK：确认已装 Python → 打开 `Build-EdgeTX-GUI.pyw` → **安装缺失项** → 分辨率默认 **2400×1440**（可改）→ 开始编译。
+首次编 APK：装好 Python（及建议的 JDK/SDK/NDK 等）→ 打开 `Build-EdgeTX-GUI.pyw` → 环境检查 → 分辨率默认 **2400×1440** → 开始编译。
 
 其它启动项与 `scripts/` 内脚本说明见 [docs/TOOLS.md](docs/TOOLS.md)。环境与注意点见 [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)、[docs/TOOLCHAIN.md](docs/TOOLCHAIN.md)。
 
