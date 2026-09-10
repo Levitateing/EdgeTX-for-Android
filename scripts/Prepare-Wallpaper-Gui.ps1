@@ -1,10 +1,11 @@
-# EdgeTX wallpaper tool (GUI). Launch: radio\src\targets\android\Prepare-Wallpaper.pyw
+﻿# EdgeTX wallpaper tool (GUI). Launch: radio\src\targets\android\Prepare-Wallpaper.pyw
 $ErrorActionPreference = "Stop"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 . (Join-Path $PSScriptRoot "lib\BuildEnvironment.ps1")
+. (Join-Path $PSScriptRoot "lib\GuiDialogs.ps1")
 
 $paths = Get-EdgeTxPaths
 $script:IsBusy = $false
@@ -62,6 +63,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = "EdgeTX 壁纸工具"
 $form.Size = New-Object System.Drawing.Size(680, 520)
 $form.StartPosition = "CenterScreen"
+Set-GuiMainForm $form
 $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
 $form.MinimumSize = New-Object System.Drawing.Size(620, 460)
 
@@ -177,7 +179,7 @@ $btnBrowse.Add_Click({
         $assets = Join-Path $paths.AppRoot "Assets"
         if (Test-Path $assets) { $dlg.InitialDirectory = $assets }
     }
-    if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    if ((Show-GuiCommonDialog $dlg) -eq [System.Windows.Forms.DialogResult]::OK) {
         $txtSource.Text = $dlg.FileName
     }
 })
@@ -195,7 +197,7 @@ $btnProcess.Add_Click({
 
     $src = $txtSource.Text.Trim()
     if (-not $src -or -not (Test-Path -LiteralPath $src)) {
-        [System.Windows.Forms.MessageBox]::Show("请先选择有效的源图片。", "提示", "OK", "Warning") | Out-Null
+        Show-GuiMessageBox ("请先选择有效的源图片。") ("提示") ("OK") ("Warning") | Out-Null
         return
     }
 
@@ -203,7 +205,7 @@ $btnProcess.Add_Click({
     try {
         $display = Test-ResolutionString ("{0}x{1}" -f $txtWidth.Text.Trim(), $txtHeight.Text.Trim())
     } catch {
-        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "分辨率无效", "OK", "Warning") | Out-Null
+        Show-GuiMessageBox ($_.Exception.Message) ("分辨率无效") ("OK") ("Warning") | Out-Null
         return
     }
 
@@ -212,13 +214,13 @@ $btnProcess.Add_Click({
     $height = $parts[1]
     $outDir = $txtOutput.Text.Trim()
     if (-not $outDir) {
-        [System.Windows.Forms.MessageBox]::Show("输出目录不能为空。", "提示", "OK", "Warning") | Out-Null
+        Show-GuiMessageBox ("输出目录不能为空。") ("提示") ("OK") ("Warning") | Out-Null
         return
     }
 
     $py = Join-Path $PSScriptRoot "generate-wallpaper.py"
     if (-not (Test-Path $py)) {
-        [System.Windows.Forms.MessageBox]::Show("缺少脚本: generate-wallpaper.py", "错误", "OK", "Error") | Out-Null
+        Show-GuiMessageBox ("缺少脚本: generate-wallpaper.py") ("错误") ("OK") ("Error") | Out-Null
         return
     }
 
@@ -250,14 +252,10 @@ $btnProcess.Add_Click({
 
         $script:LastOutputFile = Join-Path $outDir "background_${display}.png"
         Write-Log "完成。"
-        [System.Windows.Forms.MessageBox]::Show(
-            "壁纸已生成:`n$script:LastOutputFile",
-            "完成",
-            "OK",
-            "Information") | Out-Null
+        Show-GuiMessageBox ("壁纸已生成:`n$script:LastOutputFile") ("完成") ("OK") ("Information") | Out-Null
     } catch {
         Write-Log "错误: $($_.Exception.Message)"
-        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "处理失败", "OK", "Error") | Out-Null
+        Show-GuiMessageBox ($_.Exception.Message) ("处理失败") ("OK") ("Error") | Out-Null
     } finally {
         Set-Busy $false
     }
@@ -278,6 +276,6 @@ try {
     [void]$form.ShowDialog()
     exit 0
 } catch {
-    [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "严重错误", "OK", "Error") | Out-Null
+    Show-GuiMessageBox ($_.Exception.Message) ("严重错误") ("OK") ("Error") | Out-Null
     exit 1
 }

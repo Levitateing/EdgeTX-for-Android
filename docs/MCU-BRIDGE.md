@@ -7,7 +7,7 @@
 | 项 | 选择 |
 |----|------|
 | 第一期验收 | USB CDC **HELLO / PING**，再接 INPUT_STREAM |
-| 电台固件 | **先保留彩屏**（可用自带 bootloader UI 刷机） |
+| 遥控器固件 | **先保留彩屏**（可用自带 bootloader UI 刷机） |
 | 开发顺序 | **协议 + App USB + MCU Bridge 骨架** 同步推进 |
 | 最终目标 | App 与板端完整实现：模型同步、增量补丁、输入上报、脱机可飞 |
 
@@ -75,7 +75,7 @@ targets/android/
 
 ### 连接后同步策略（App）
 
-1. **GET_RADIO**：电台校准/硬件设置为权威 → 写入 App SIMU  
+1. **GET_RADIO**：遥控器校准/硬件设置为权威 → 写入 App SIMU  
 2. **STATUS.model_crc** 与本地比较：相同则跳过 PUT；不同则 **PUT_MODEL**（App 模型库为权威）  
 3. 之后 App 编辑走 PATCH/PUT；stickMode 变化走 PUT_RADIO_FLIGHT  
 
@@ -85,10 +85,11 @@ targets/android/
 
 **推荐（一键）：** 双击
 
-`radio\src\targets\android\Build-Radio.bat`
+`radio\src\targets\android\Build-Radio-GUI.pyw`  
+（或 `Build-Radio-GUI.bat`）
 
 - 默认打开 GUI，选 **TX16S** 或 **H750** 后点 Start build  
-- 控制台模式：`Build-Radio.bat TX16S`
+- 控制台模式：`Build-Radio-GUI.bat TX16S`
 
 或直接调用底层脚本：
 
@@ -132,5 +133,5 @@ powershell -NoProfile -File radio\src\targets\android\scripts\build-android-radi
 ## 测试点
 
 1. 连上后横幅出现 `GET_RADIO applied`；模型相同时 `model CRC match — skip PUT`  
-2. App 改混控后仍 PATCH/PUT 到电台  
+2. App 改混控后仍 PATCH/PUT 到遥控器  
 3. OTG 权限 / VCP 自动起 / HELLO 关 USB 菜单  

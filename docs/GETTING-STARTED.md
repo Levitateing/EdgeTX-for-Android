@@ -40,17 +40,18 @@ git submodule add <your-fork-url> radio/src/targets/android
 | 场景 | 系统 | 必需 |
 |------|------|------|
 | 编 APK | **Windows**（当前脚本主路径） | 见 [TOOLCHAIN.md](TOOLCHAIN.md)；可用 GUI 自动装到 `.tools/` |
-| 编电台固件 | Windows | ARM GCC + CMake + Ninja + Python 等 |
+| 编遥控器固件 | Windows | ARM GCC + CMake + Ninja + Python 等 |
 
-详见 [TOOLCHAIN.md](TOOLCHAIN.md)。
+详见 [TOOLCHAIN.md](TOOLCHAIN.md)。全部 GUI / 脚本一览见 [TOOLS.md](TOOLS.md)。
 
 ## 4. 首次编译 APK
 
-1. 进入 `radio/src/targets/android/`  
-2. 双击 **`Build-EdgeTX-GUI.pyw`**  
-3. 点击安装缺失工具（JDK / SDK / NDK / CMake / resvg 等会进 `.tools/`，约数 GB）  
-4. 默认分辨率 **2400×1440**，开始编译  
-5. 产物：`output/EdgeTX.apk`（arm64-v8a）
+1. **先安装 [Python 3](https://www.python.org/downloads/)**（勾选 Add to PATH）。`.pyw` 依赖本机 Python；「安装缺失项」会装 pip 包与 `.tools/`，**不会**装 Python 本体。  
+2. 进入 `radio/src/targets/android/`  
+3. 双击 **`Build-EdgeTX-GUI.pyw`**  
+4. 点击安装缺失工具（Pillow/libclang 走 pip；JDK / SDK / NDK / CMake / resvg 等进 `.tools/`，约数 GB）  
+5. 默认分辨率 **2400×1440**，开始编译  
+6. 产物：`output/EdgeTX.apk`（arm64-v8a）
 
 命令行等价：
 
@@ -90,12 +91,13 @@ powershell -NoProfile -File radio\src\targets\android\scripts\build-apk.ps1
 powershell -NoProfile -File radio\src\targets\android\scripts\validate-paths.ps1
 ```
 
-## 8. 电台固件（可选）
+## 8. 遥控器固件（可选）
 
 试验机初代 TX16S（F429）：
 
 ```powershell
-# 或双击 Build-Radio.bat
+# 或双击 Build-Radio-GUI.pyw（无控制台；推荐）
+# 命令行：Build-Radio-GUI.bat TX16S
 powershell -NoProfile -File radio\src\targets\android\scripts\build-android-radio.ps1 -Hw TX16S
 ```
 

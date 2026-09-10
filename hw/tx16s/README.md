@@ -40,9 +40,9 @@
 
 ```powershell
 # 一键 GUI（推荐）
-# 双击: radio\src\targets\android\Build-Radio.bat
+# 双击: radio\src\targets\android\Build-Radio-GUI.pyw
 
 # 或控制台:
-# Build-Radio.bat TX16S
+# Build-Radio-GUI.bat TX16S
 powershell -NoProfile -File radio\src\targets\android\scripts\build-android-radio.ps1 -Hw TX16S
 ```

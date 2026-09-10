@@ -3,6 +3,7 @@
 | Doc | Content |
 |-----|---------|
 | [GETTING-STARTED.md](GETTING-STARTED.md) | Drop into EdgeTX tree, first build, notes |
+| [TOOLS.md](TOOLS.md) | GUI launchers and scripts overview |
 | [TOOLCHAIN.md](TOOLCHAIN.md) | Toolchain (APK / radio firmware) |
 | [OVERLAY-INJECTION.md](OVERLAY-INJECTION.md) | Files injected into upstream during build |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Layout and runtime |

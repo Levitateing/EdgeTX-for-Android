@@ -18,7 +18,7 @@
 | **zig**（或官方 lz4_font 工具链） | 字库 LZ4 时 | 与 EdgeTX 字体格式兼容 |
 | **Git** | 可选 | 版本字符串；缺了一般仍能编 |
 
-**推荐做法：** 双击 `Build-EdgeTX-GUI.pyw` →「安装缺失项」，由脚本下载到 `.tools/`。
+**推荐做法：** 先装好本机 **Python 3**，再双击 `Build-EdgeTX-GUI.pyw` →「安装缺失项」（pip 包 + 下载到 `.tools/`）。Python 本体不会自动安装。
 
 磁盘：仅工具链常占 **数 GB**；另加 CMake/Gradle 中间产物。
 
@@ -28,7 +28,7 @@
 - WASI / WAMR（旧 WASM 路径已非主路径）  
 - Companion / Qt  
 
-## B. 编译 MCU 电台固件（`Build-Radio`）
+## B. 编译 MCU 遥控器固件（`Build-Radio`）
 
 | 组件 | 是否必需 | 用途 |
 |------|----------|------|
@@ -38,7 +38,7 @@
 | **Git** | 可选 | 短 commit 嵌入版本号 |
 
 可用 `scripts/ensure-arm-gcc.ps1` 装到 `.tools/`。  
-**编电台固件不需要** Android SDK/NDK。
+**编遥控器固件不需要** Android SDK/NDK。
 
 ## C. 运行时设备
 
@@ -46,7 +46,7 @@
 |------|------|
 | 跑 APK | arm64 Android 手机；超宽屏可用 2400×1440 FIT |
 | SD | `/sdcard/EdgeTX`，Android 11+ 文件访问权限 |
-| MCU 联调 | OTG + USB CDC；电台 USB 模式选 Serial/VCP；建议电池供电 |
+| MCU 联调 | OTG + USB CDC；遥控器 USB 模式选 Serial/VCP；建议电池供电 |
 
 ## D. 验证
 

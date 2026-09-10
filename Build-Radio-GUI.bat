@@ -1,6 +1,7 @@
 @echo off
-REM EdgeTX ANDROID radio firmware — one-click build (TX16S / H750).
-REM Double-click this file, or: Build-Radio.bat TX16S
+REM EdgeTX ANDROID radio firmware — GUI or console one-shot
+REM Prefer: Build-Radio-GUI.pyw (no console). This .bat can flash a console for GUI.
+REM Console: Build-Radio-GUI.bat TX16S | H750
 cd /d "%~dp0"
 
 REM Ensure GUI script is UTF-8 with BOM (Chinese Windows + PS 5.1)
@@ -10,15 +11,16 @@ if /I "%~1"=="gui" goto :gui
 if /I "%~1"=="" goto :gui
 if /I "%~1"=="/gui" goto :gui
 
-REM Console one-shot: Build-Radio.bat TX16S | H750
+REM Console one-shot: Build-Radio-GUI.bat TX16S | H750
 set "HW=%~1"
 if /I "%HW%"=="TX16S" goto :console
 if /I "%HW%"=="H750" goto :console
 echo Unknown board: %HW%
 echo Usage:
-echo   Build-Radio.bat           ^(GUI^)
-echo   Build-Radio.bat TX16S     ^(console^)
-echo   Build-Radio.bat H750      ^(console^)
+echo   Build-Radio-GUI.pyw       ^(GUI, no console^)
+echo   Build-Radio-GUI.bat       ^(GUI via powershell^)
+echo   Build-Radio-GUI.bat TX16S ^(console^)
+echo   Build-Radio-GUI.bat H750  ^(console^)
 pause
 exit /b 1
 

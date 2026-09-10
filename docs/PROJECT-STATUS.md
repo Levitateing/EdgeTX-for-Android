@@ -192,7 +192,7 @@ radio/src/lua/widgets.cpp                   — lsWidgets 注册 LCD_W=800, LCD_
 
 ### 5.1 功能（`Build-EdgeTX-Gui.ps1`）
 
-- **[1] 环境检查**：12 项工具 OK/MISSING；Install missing → `android-app/.tools`
+- **[1] 环境检查**：12 项工具 OK/MISSING；Install missing → `.tools`
 - **[2] 已预编译资源**：ListView 扫描位图/字库；添加/删除分辨率；800×480 禁止删
 - **[3] 编译日志**：实时输出 + 进度条；字库「不完整」自动 `-ForceAssets`
 - **中/英切换**；宽/高分栏输入；`ensure-gui-utf8.ps1` 保证 UTF-8 BOM

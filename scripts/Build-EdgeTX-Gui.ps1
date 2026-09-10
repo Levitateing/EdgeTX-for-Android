@@ -1,10 +1,11 @@
-﻿# EdgeTX Android build wizard (GUI). Launch: radio\src\targets\android\Build-EdgeTX.bat
+﻿# EdgeTX Android build wizard (GUI). Prefer: Build-EdgeTX-GUI.pyw / Build-EdgeTX-GUI.bat
 $ErrorActionPreference = "Stop"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 . (Join-Path $PSScriptRoot "lib\BuildEnvironment.ps1")
+. (Join-Path $PSScriptRoot "lib\GuiDialogs.ps1")
 
 $paths = Get-EdgeTxPaths
 $script:IsBusy = $false
@@ -220,6 +221,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = T "Title"
 $form.Size = New-Object System.Drawing.Size(920, 800)
 $form.StartPosition = "CenterScreen"
+Set-GuiMainForm $form
 $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
 $form.MinimumSize = New-Object System.Drawing.Size(820, 700)
 
@@ -570,13 +572,12 @@ $mnuDeleteRes.Add_Click({
     if ($lvRes.SelectedItems.Count -eq 0) { return }
     $res = $lvRes.SelectedItems[0].Text
     if (Test-EdgeTxResolutionProtected $res) {
-        [System.Windows.Forms.MessageBox]::Show((T "MsgCannotDeleteStock"), (T "MsgDeleteTitle"),
-            "OK", "Warning") | Out-Null
+        Show-GuiMessageBox ((T "MsgCannotDeleteStock")) ((T "MsgDeleteTitle")) ("OK") ("Warning") | Out-Null
         return
     }
     $row = $lvRes.SelectedItems[0].Tag
     $msg = (T "MsgDeleteBody") -f $res, $row.FontDir
-    $r = [System.Windows.Forms.MessageBox]::Show($msg, (T "MsgDeleteTitle"), "YesNo", "Warning")
+    $r = Show-GuiMessageBox ($msg) ((T "MsgDeleteTitle")) ("YesNo") ("Warning")
     if ($r -ne "Yes") { return }
 
     Set-Busy $true
@@ -586,7 +587,7 @@ $mnuDeleteRes.Add_Click({
         foreach ($path in $removed) { & $script:LogBlock "  - $path" }
         Update-ResolutionList -SelectResolution ""
     } catch {
-        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, (T "MsgDeleteTitle"), "OK", "Error") | Out-Null
+        Show-GuiMessageBox ($_.Exception.Message) ((T "MsgDeleteTitle")) ("OK") ("Error") | Out-Null
     } finally { Set-Busy $false }
 })
 
@@ -595,12 +596,11 @@ $btnAddRes.Add_Click({
     try {
         $res = Parse-ResolutionInput
     } catch {
-        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, (T "MsgResTitle"), "OK", "Error") | Out-Null
+        Show-GuiMessageBox ($_.Exception.Message) ((T "MsgResTitle")) ("OK") ("Error") | Out-Null
         return
     }
     if (@(Get-EdgeTxKnownResolutions) -contains $res) {
-        [System.Windows.Forms.MessageBox]::Show(((T "MsgResExists") -f $res), (T "MsgResTitle"),
-            "OK", "Information") | Out-Null
+        Show-GuiMessageBox (((T "MsgResExists") -f $res)) ((T "MsgResTitle")) ("OK") ("Information") | Out-Null
         Update-ResolutionList -SelectResolution $res
         return
     }
@@ -630,13 +630,12 @@ $btnInstall.Add_Click({
     if ($script:IsBusy) { return }
     $missing = @(Get-EdgeTxToolStatus | Where-Object { -not $_.Ok -and $_.Installable })
     if ($missing.Count -eq 0) {
-        [System.Windows.Forms.MessageBox]::Show((T "MsgNothingInstall"), (T "Title"),
-            "OK", "Information") | Out-Null
+        Show-GuiMessageBox ((T "MsgNothingInstall")) ((T "Title")) ("OK") ("Information") | Out-Null
         return
     }
     $lines = ($missing | ForEach-Object { "  - $($_.Name) $($_.SizeHint) -> $($_.Scope)" }) -join "`n"
     $msg = (T "MsgInstallBody") -f $lines
-    $r = [System.Windows.Forms.MessageBox]::Show($msg, (T "MsgInstallTitle"), "YesNo", "Question")
+    $r = Show-GuiMessageBox ($msg) ((T "MsgInstallTitle")) ("YesNo") ("Question")
     if ($r -ne "Yes") { return }
 
     Set-Busy $true
@@ -647,7 +646,7 @@ $btnInstall.Add_Click({
         & $script:LogBlock (T "LogInstallDone")
     } catch {
         & $script:LogBlock ((T "LogInstallFailed") -f $_.Exception.Message)
-        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, (T "MsgInstallFailed"), "OK", "Error") | Out-Null
+        Show-GuiMessageBox ($_.Exception.Message) ((T "MsgInstallFailed")) ("OK") ("Error") | Out-Null
     } finally { Set-Busy $false }
 })
 
@@ -656,15 +655,13 @@ $btnBuild.Add_Click({
 
     $res = Get-SelectedResolution
     if (-not $res) {
-        [System.Windows.Forms.MessageBox]::Show((T "MsgNoSelection"), (T "Title"), "OK", "Warning") | Out-Null
+        Show-GuiMessageBox ((T "MsgNoSelection")) ((T "Title")) ("OK") ("Warning") | Out-Null
         return
     }
 
     $requiredMissing = @(Get-EdgeTxToolStatus | Where-Object { $_.Required -and -not $_.Ok })
     if ($requiredMissing.Count -gt 0) {
-        [System.Windows.Forms.MessageBox]::Show(
-            ((T "MsgCannotBuild") -f $requiredMissing.Count),
-            (T "Title"), "OK", "Warning") | Out-Null
+        Show-GuiMessageBox (((T "MsgCannotBuild") -f $requiredMissing.Count)) ((T "Title")) ("OK") ("Warning") | Out-Null
         return
     }
 
@@ -677,7 +674,7 @@ $btnBuild.Add_Click({
                      elseif ($row.FontsState -eq "partial") { T "AutoGenerate" }
                      else { T "GenerateAtCfg" }
     $confirm = (T "MsgBuildBody") -f $res, $bmpNote, $fntNote, $genNote
-    $r = [System.Windows.Forms.MessageBox]::Show($confirm, (T "MsgBuildTitle"), "YesNo", "Question")
+    $r = Show-GuiMessageBox ($confirm) ((T "MsgBuildTitle")) ("YesNo") ("Question")
     if ($r -ne "Yes") { return }
 
     $forceAssets = ($row.FontsState -eq "partial") -or (-not $assets.BitmapsReady) -or (-not $assets.FontsReady)
@@ -721,9 +718,7 @@ $btnBuild.Add_Click({
 
         Update-ResolutionList -SelectResolution $res
 
-        [System.Windows.Forms.MessageBox]::Show(
-            ((T "MsgSuccessBody") -f $apk),
-            (T "MsgSuccessTitle"), "OK", "Information") | Out-Null
+        Show-GuiMessageBox (((T "MsgSuccessBody") -f $apk)) ((T "MsgSuccessTitle")) ("OK") ("Information") | Out-Null
     } catch {
         $errMsg = Format-EdgeTxExceptionMessage $_
         & $script:LogBlock ""
@@ -736,7 +731,7 @@ $btnBuild.Add_Click({
         } catch {
             & $script:LogBlock ((T "LogOverlayRestoreFailed") -f $_.Exception.Message)
         }
-        [System.Windows.Forms.MessageBox]::Show($errMsg, (T "MsgBuildFailed"), "OK", "Error") | Out-Null
+        Show-GuiMessageBox ($errMsg) ((T "MsgBuildFailed")) ("OK") ("Error") | Out-Null
     } finally { Set-Busy $false }
 })
 
@@ -770,6 +765,6 @@ try {
     [void]$form.ShowDialog()
     exit 0
 } catch {
-    [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, (T "ErrFatal"), "OK", "Error") | Out-Null
+    Show-GuiMessageBox ($_.Exception.Message) ((T "ErrFatal")) ("OK") ("Error") | Out-Null
     exit 1
 }

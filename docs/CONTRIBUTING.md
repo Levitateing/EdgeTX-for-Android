@@ -9,6 +9,6 @@
 
 不要提交：`.tools/`、`generated/`、`build-*`、APK。  
 不要长期留下已 apply 的 overlay 再编其它官方 PCB。  
-不要假设 Android 模型与官方电台互通。
+不要假设 Android 模型与官方遥控器互通。
 
 改注入列表时同步更新 [OVERLAY-INJECTION.md](OVERLAY-INJECTION.md)。

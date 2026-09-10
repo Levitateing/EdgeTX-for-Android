@@ -2,7 +2,8 @@
 
 按本文操作即可：**选分辨率 → 编固件 → 打 APK → 安装验证**。
 
-相关文档：[README.md](./README.md)、[PROJECT-STATUS.md](./PROJECT-STATUS.md)。
+相关文档：[README.md](../README.md)、[PROJECT-STATUS.md](./PROJECT-STATUS.md)、[TOOLS.md](./TOOLS.md)。
+工作目录下文默认：`<edgetx>/radio/src/targets/android/`。
 
 ---
 
@@ -25,7 +26,7 @@
 | PowerShell | Win10/11 |
 | Python 3 | 位图/字体、codegen |
 | `pip install libclang` | 固件生成（脚本可自动装） |
-| `android-app\.tools\` | JDK 17、Gradle、SDK、NDK 27、CMake、Ninja |
+| `.tools\` | JDK 17、Gradle、SDK、NDK 27、CMake、Ninja（本平台目录内） |
 
 首次某分辨率还会自动准备 **resvg**、**Node.js + lv_font_conv**。
 
@@ -43,8 +44,8 @@
 
 | 入口 | 说明 |
 |------|------|
-| `Build-EdgeTX.pyw` | **推荐**，无命令行窗口 |
-| `Build-EdgeTX.bat` | 同上（调用 pythonw） |
+| `Build-EdgeTX-GUI.pyw` | **推荐**，无命令行窗口 |
+| `Build-EdgeTX-GUI.bat` | 同上（调用 pythonw） |
 
 界面右上角可切换中/英文。
 
@@ -53,7 +54,7 @@
 **[1] 环境检查**
 
 - 列出 Python、CMake、NDK、JDK、resvg、lv_font_conv 等 12 项
-- **Install missing**：弹窗确认后下载到 `android-app\.tools`（首次 NDK 约 1.5 GB）
+- **Install missing**：弹窗确认后下载到 `.tools`（首次 NDK 约 1.5 GB）；Python 本体需事先安装
 
 **[2] 已预编译资源**（原「预设」）
 
@@ -82,26 +83,26 @@
 # 推荐：3200×1440 手机
 $Display = "2400x1440"
 
-powershell -NoProfile -File android-app\scripts\build-android-native.ps1 -Display $Display
-powershell -NoProfile -File android-app\scripts\build-apk.ps1
+powershell -NoProfile -File scripts\build-android-native.ps1 -Display $Display
+powershell -NoProfile -File scripts\build-apk.ps1
 ```
 
 强制重生成资源（换分辨率、字库不完整、缩放公式变更后）：
 
 ```powershell
-powershell -NoProfile -File android-app\scripts\build-android-native.ps1 -Display $Display -ForceAssets
+powershell -NoProfile -File scripts\build-android-native.ps1 -Display $Display -ForceAssets
 ```
 
 仅预生成位图/字体：
 
 ```powershell
-powershell -NoProfile -File android-app\scripts\generate-display-assets.ps1 -Resolution 2400x1440 -Force
+powershell -NoProfile -File scripts\generate-display-assets.ps1 -Resolution 2400x1440 -Force
 ```
 
 仅重生成字库（位图不动）：
 
 ```powershell
-powershell -NoProfile -File android-app\scripts\generate-display-assets.ps1 -Resolution 2400x1440 -FontsOnly -Force
+powershell -NoProfile -File scripts\generate-display-assets.ps1 -Resolution 2400x1440 -FontsOnly -Force
 ```
 
 ---
@@ -153,7 +154,7 @@ LAYOUT_SCALE(x) = (x × 11 × H + 1920) / (8 × 480)   # = round(x × scale)
 `+1920` 是分母 3840 的 0.5 舍入偏置，**不能**写成 `+ 4×H`（仅在 H=480 时等价；高分辨率会让 UI 比位图大约 1px）。
 
 位图（resvg 从 SVG）、字体、布局间距共用同一套整数缩放。  
-**例外**：800×480 等官方电台存量档不走 `EDGE_TX_DISPLAY` 自动化。
+**例外**：800×480 等官方遥控器存量档不走 `EDGE_TX_DISPLAY` 自动化。
 
 configure 时（`EdgeTXDisplay.cmake`）自动：生成位图/字体、`display_hw.json`、`BITMAPS_DIR=WxH`。
 
@@ -183,11 +184,11 @@ configure 时（`EdgeTXDisplay.cmake`）自动：生成位图/字体、`display_
 
 ```powershell
 # 清理 1280×720 位图 + 字库 + CMake 缓存（示例）
-powershell -NoProfile -File android-app\scripts\clean-display-assets.ps1 -Resolution 1280x720 -IncludeBuildDirs
+powershell -NoProfile -File scripts\clean-display-assets.ps1 -Resolution 1280x720 -IncludeBuildDirs
 
 # 强制重生成并编译
-powershell -NoProfile -File android-app\scripts\build-android-native.ps1 -Display 1280x720 -ForceAssets
-powershell -NoProfile -File android-app\scripts\build-apk.ps1
+powershell -NoProfile -File scripts\build-android-native.ps1 -Display 1280x720 -ForceAssets
+powershell -NoProfile -File scripts\build-apk.ps1
 ```
 
 **勿删**：`bitmaps/800x480`、`fonts/lvgl/lrg`（TX16 官方资源）。
@@ -205,7 +206,7 @@ GUI：右键列表中分辨率 → **删除分辨率**（800×480 灰掉）。
 | 改 Kotlin / 宿主 C++ | 仅 `build-apk.ps1` |
 | 改 `ScaleMode` | 仅 `build-apk.ps1` |
 | 改 Lua 坐标缩放 / `lcd.*` API | 重编 native + APK（**不必** `-ForceAssets`） |
-| 改模型数据结构 | + `cmake --build android-app/build-android-arm64 --target yaml_data` |
+| 改模型数据结构 | + `cmake --build build-android-arm64 --target yaml_data` |
 | 仅 `LAYOUT_SCALE` 宏修复 | 重编 native + APK（**不必** `-ForceAssets`） |
 | 缩放公式 / 位图策略变更 | `-ForceAssets` + 必要时 `clean-display-assets.ps1` |
 
@@ -249,7 +250,7 @@ EdgeTX 有 **C++ 结构体** 与 **YAML 描述** 两套布局，必须一致。
 ```text
 1. 改 datastructs_private.h / dataconstants.h
 2. 更新 datastructs.h 中 CHKSIZE(...)
-3. cmake --build android-app/build-android-arm64 --target yaml_data
+3. cmake --build build-android-arm64 --target yaml_data
    （不要只手改 yaml_datastructs_*.cpp 单个字段）
 4. 重编 native + APK
 ```
@@ -294,7 +295,7 @@ python -m pip install libclang
 
 ### Q7：GUI 中文乱码 / 闪退 `'ndroid'`
 
-- 运行 `scripts\ensure-gui-utf8.ps1` 或更新后的 `Build-EdgeTX.bat`
+- 运行 `scripts\ensure-gui-utf8.ps1` 或更新后的 `Build-EdgeTX-GUI.bat`
 - 构建已改为进程内调用脚本，避免路径 `\a` 截断
 
 ### Q8：闪退
@@ -332,21 +333,21 @@ adb logcat -s EdgeTXNative:* EdgeTXFW:* libc:*
 
 ```powershell
 # 默认 2400×1440
-powershell -NoProfile -File android-app\scripts\build-android-native.ps1
+powershell -NoProfile -File scripts\build-android-native.ps1
 
 # 指定分辨率 + 强制资源
-powershell -NoProfile -File android-app\scripts\build-android-native.ps1 -Display 2400x1440 -ForceAssets
+powershell -NoProfile -File scripts\build-android-native.ps1 -Display 2400x1440 -ForceAssets
 
 # 只打 APK
-powershell -NoProfile -File android-app\scripts\build-apk.ps1
+powershell -NoProfile -File scripts\build-apk.ps1
 
 # 清理 + 重编（示例 1280×720）
-powershell -NoProfile -File android-app\scripts\clean-display-assets.ps1 -Resolution 1280x720 -IncludeBuildDirs
-powershell -NoProfile -File android-app\scripts\build-android-native.ps1 -Display 1280x720 -ForceAssets
-powershell -NoProfile -File android-app\scripts\build-apk.ps1
+powershell -NoProfile -File scripts\clean-display-assets.ps1 -Resolution 1280x720 -IncludeBuildDirs
+powershell -NoProfile -File scripts\build-android-native.ps1 -Display 1280x720 -ForceAssets
+powershell -NoProfile -File scripts\build-apk.ps1
 
 # YAML 结构体变更后
-cmake --build android-app/build-android-arm64 --target yaml_data
+cmake --build build-android-arm64 --target yaml_data
 ```
 
 ---
@@ -355,22 +356,22 @@ cmake --build android-app/build-android-arm64 --target yaml_data
 
 ```
 edgetx/
-├── android-app/
-│   ├── output/EdgeTX.apk
-│   ├── build-android-arm64/
-│   ├── Build-EdgeTX.pyw / Build-EdgeTX.bat
-│   ├── display-resolutions.json
-│   ├── README.md / PROJECT-STATUS.md / BUILD-RESOLUTION.md
-│   └── scripts/
-│       ├── Build-EdgeTX-Gui.ps1
-│       ├── build-android-native.ps1
-│       ├── build-apk.ps1
-│       ├── generate-display-assets.ps1
-│       ├── clean-display-assets.ps1
-│       └── ensure-gui-utf8.ps1
-└── radio/src/
-    ├── bitmaps/800x480/、2400x1440/、…
-    └── fonts/lvgl/lrg/、disp2400/、…
+└── radio/src/targets/android/          ← 本平台包
+    ├── output/EdgeTX.apk
+    ├── build-android-arm64/
+    ├── Build-EdgeTX-GUI.pyw / Build-EdgeTX-GUI.bat
+    ├── display-resolutions.json
+    ├── README.md
+    ├── docs/                           ← PROJECT-STATUS / BUILD-RESOLUTION / TOOLS…
+    └── scripts/
+        ├── Build-EdgeTX-Gui.ps1
+        ├── build-android-native.ps1
+        ├── build-apk.ps1
+        ├── generate-display-assets.ps1
+        ├── clean-display-assets.ps1
+        └── ensure-gui-utf8.ps1
+
+（位图/字库生成结果主要在本目录 generated/，或按脚本 stage 到构建期望路径）
 ```
 
 ---

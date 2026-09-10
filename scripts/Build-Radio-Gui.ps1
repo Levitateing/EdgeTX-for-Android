@@ -1,11 +1,12 @@
 ﻿# EdgeTX ANDROID radio firmware build wizard (GUI).
-# Layout mirrors Build-EdgeTX-Gui.ps1. Launch: Build-Radio.bat
+# Layout mirrors Build-EdgeTX-Gui.ps1. Prefer launch: Build-Radio-GUI.pyw
 $ErrorActionPreference = "Stop"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 . (Join-Path $PSScriptRoot "lib\BuildEnvironment.ps1")
+. (Join-Path $PSScriptRoot "lib\GuiDialogs.ps1")
 
 $paths = Get-EdgeTxPaths
 $script:IsBusy = $false
@@ -209,6 +210,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = T "Title"
 $form.Size = New-Object System.Drawing.Size(920, 760)
 $form.StartPosition = "CenterScreen"
+Set-GuiMainForm $form
 $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
 $form.MinimumSize = New-Object System.Drawing.Size(820, 640)
 
@@ -517,12 +519,11 @@ $btnInstall.Add_Click({
     if ($script:IsBusy) { return }
     $missing = @(Get-RadioToolStatus | Where-Object { -not $_.Ok -and $_.Installable })
     if ($missing.Count -eq 0) {
-        [System.Windows.Forms.MessageBox]::Show((T "MsgNothingInstall"), (T "Title"), "OK", "Information") | Out-Null
+        Show-GuiMessageBox ((T "MsgNothingInstall")) ((T "Title")) ("OK") ("Information") | Out-Null
         return
     }
     $list = ($missing | ForEach-Object { "  - $($_.Name) $($_.SizeHint)" }) -join "`n"
-    $r = [System.Windows.Forms.MessageBox]::Show(
-        ((T "MsgInstallBody") -f $list), (T "MsgInstallTitle"), "YesNo", "Question")
+    $r = Show-GuiMessageBox (((T "MsgInstallBody") -f $list)) ((T "MsgInstallTitle")) ("YesNo") ("Question")
     if ($r -ne "Yes") { return }
 
     Set-Busy $true
@@ -541,7 +542,7 @@ $btnInstall.Add_Click({
         Update-ToolList
     } catch {
         Append-Log ((T "LogInstallFailed") -f $_.Exception.Message)
-        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, (T "MsgInstallFailed"), "OK", "Error") | Out-Null
+        Show-GuiMessageBox ($_.Exception.Message) ((T "MsgInstallFailed")) ("OK") ("Error") | Out-Null
     } finally {
         Set-Busy $false
     }
@@ -557,19 +558,18 @@ function Start-RadioBuild {
     if ($script:IsBusy) { return }
     $hw = Get-SelectedHw
     if (-not $hw) {
-        [System.Windows.Forms.MessageBox]::Show((T "MsgNoBoard"), (T "Title"), "OK", "Warning") | Out-Null
+        Show-GuiMessageBox ((T "MsgNoBoard")) ((T "Title")) ("OK") ("Warning") | Out-Null
         return
     }
     $missing = @(Get-RadioToolStatus | Where-Object { $_.Required -and -not $_.Ok })
     if ($missing.Count -gt 0) {
-        [System.Windows.Forms.MessageBox]::Show(
-            ((T "MsgCannotBuild") -f $missing.Count), (T "Title"), "OK", "Warning") | Out-Null
+        Show-GuiMessageBox (((T "MsgCannotBuild") -f $missing.Count)) ((T "Title")) ("OK") ("Warning") | Out-Null
         return
     }
 
     $hwTag = $hw.ToLower()
     $confirm = (T "MsgBuildBody") -f $hw, $hwTag
-    if ([System.Windows.Forms.MessageBox]::Show($confirm, (T "MsgBuildTitle"), "YesNo", "Question") -ne "Yes") {
+    if (Show-GuiMessageBox ($confirm) ((T "MsgBuildTitle")) ("YesNo") ("Question") -ne "Yes") {
         return
     }
 
@@ -707,11 +707,10 @@ exit `$LASTEXITCODE
                 } else {
                     (T "MsgSuccessMissing") -f $hwTagDone
                 }
-                [System.Windows.Forms.MessageBox]::Show($body, (T "MsgSuccessTitle"), "OK", "Information") | Out-Null
+                Show-GuiMessageBox ($body) ((T "MsgSuccessTitle")) ("OK") ("Information") | Out-Null
             } else {
                 Append-Log ((T "LogFailed") -f $code)
-                [System.Windows.Forms.MessageBox]::Show(
-                    ((T "LogFailed") -f $code), (T "MsgBuildFailed"), "OK", "Error") | Out-Null
+                Show-GuiMessageBox (((T "LogFailed") -f $code)) ((T "MsgBuildFailed")) ("OK") ("Error") | Out-Null
             }
             Set-Busy $false
         } catch {
@@ -731,8 +730,7 @@ $form.Add_Resize({ Update-LanguageLayout; Update-BottomLayout })
 $form.Add_Shown({ Update-LanguageLayout; Update-BottomLayout })
 $form.Add_FormClosing({
     if ($script:BuildProc -and -not $script:BuildProc.HasExited) {
-        $r = [System.Windows.Forms.MessageBox]::Show(
-            (T "MsgBusyBody"), (T "MsgBusyTitle"), "YesNo", "Warning")
+        $r = Show-GuiMessageBox ((T "MsgBusyBody")) ((T "MsgBusyTitle")) ("YesNo") ("Warning")
         if ($r -ne "Yes") { $_.Cancel = $true; return }
         try { $script:BuildProc.Kill() } catch { }
     }
@@ -758,6 +756,6 @@ try {
     }
     [void]$form.ShowDialog()
 } catch {
-    [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, (T "ErrFatal"), "OK", "Error") | Out-Null
+    Show-GuiMessageBox ($_.Exception.Message) ((T "ErrFatal")) ("OK") ("Error") | Out-Null
     throw
 }
