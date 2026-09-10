@@ -8,13 +8,10 @@
 
 本仓库**只包含**平台目录内容，需配合官方 [EdgeTX/edgetx](https://github.com/EdgeTX/edgetx) 构建完整项目。
 
-本维护副本对照上游（建议你也固定同一 commit）：
+**兼容基线（EdgeTX）：** [`96ab274`](https://github.com/EdgeTX/edgetx/commit/96ab2745d1bc0025c5508ac8a3b862f34cf97c6e)  
+其它上游提交上使用前，请自行确认 overlay 与编译通过。
 
-```text
-96ab2745d1bc0025c5508ac8a3b862f34cf97c6e
-```
-
-本项目在 Windows 11 环境下开发；**全部代码由 AI 生成**（维护者未手写业务代码），仅供学习交流。使用、刷机与飞行风险自负；本人不对任何非正常情况负责。
+本项目在 Windows 11 环境下开发；**全部代码由 AI 生成**，仅供学习交流。使用、刷机与飞行风险自负；本人不对任何非正常情况负责。
 
 **应用包名（applicationId）：** `io.github.levitateing.etxandroid`  
 （刻意不使用 `org.edgetx.*`，避免被误认为官方 App。若曾安装旧包 `org.edgetx.ui`，请先卸载再装新 APK。）
@@ -26,7 +23,7 @@
 ## 快速开始
 
 ```bash
-# 1. 官方固件树（建议固定到上面的 commit）
+# 1. 官方固件树（建议检出兼容基线）
 git clone https://github.com/EdgeTX/edgetx.git
 cd edgetx
 git checkout 96ab2745d1bc0025c5508ac8a3b862f34cf97c6e

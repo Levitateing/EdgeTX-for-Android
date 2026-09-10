@@ -22,11 +22,7 @@
 | 用法 | 放入官方源码树对应路径后编译 |
 | applicationId | `io.github.levitateing.etxandroid` |
 
-建议在 README/发行说明中写明所基于的 EdgeTX **commit / tag**。本维护副本曾对照：
-
-```text
-commit 96ab2745d1bc0025c5508ac8a3b862f34cf97c6e
-```
+**兼容基线：** [`96ab274`](https://github.com/EdgeTX/edgetx/commit/96ab2745d1bc0025c5508ac8a3b862f34cf97c6e)（完整 hash 见该链接）。其它上游版本请自行验证。
 
 完整 APK 还会用到官方树内第三方组件（LVGL 等），许可证以 EdgeTX 仓库为准。`SD-Card-Files/` 中若含社区资源，请自行核对其原许可。
 
