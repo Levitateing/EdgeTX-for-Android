@@ -7,7 +7,6 @@
 
 - 软件许可（GPL）与名称/商标是两回事：你可以在 GPL 下使用与修改 EdgeTX **源码**，但 **不得** 将本发行物表述为官方 EdgeTX，也 **不得** 擅自将 [EdgeTX 官方 logo](https://edgetx.org/logos/) 用于商业或易混淆的产品宣传。  
 - 官方对自维护分支的建议表述类似：*custom branch of EdgeTX*（见 [EdgeTX on your radio](https://edgetx.org/edgetxsupport/)）。  
-- 本 App 的 Android **applicationId** 为 `io.github.levitateing.etxandroid`（**不是** `org.edgetx.*`），桌面名为 **ETx Android (Unofficial)**，以降低与官方产品混淆的风险。
 
 ## 软件许可证
 
@@ -20,7 +19,6 @@
 | 上游 | https://github.com/EdgeTX/edgetx |
 | 本仓 | 仅 `radio/src/targets/android/` 平台包 |
 | 用法 | 放入官方源码树对应路径后编译 |
-| applicationId | `io.github.levitateing.etxandroid` |
 
 **兼容基线：** [`96ab274`](https://github.com/EdgeTX/edgetx/commit/96ab2745d1bc0025c5508ac8a3b862f34cf97c6e)（完整 hash 见该链接）。其它上游版本请自行验证。
 

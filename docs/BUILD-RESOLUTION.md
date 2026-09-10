@@ -216,7 +216,7 @@ GUI：右键列表中分辨率 → **删除分辨率**（800×480 灰掉）。
 
 ## 8. 安装与验证
 
-1. 卸载 `io.github.levitateing.etxandroid`（若仍有旧包 `org.edgetx.ui` 一并卸掉）
+1. 卸载旧 APK 后再装新包
 2. 安装 `output/EdgeTX.apk`
 3. 授予「所有文件访问」
 4. 横屏打开
