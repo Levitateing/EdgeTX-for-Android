@@ -1,4 +1,4 @@
-package org.edgetx.ui.bridge
+package io.github.levitateing.etxandroid.bridge
 
 /**
  * Diff two ModelData blobs into PATCH regions (coalesced).

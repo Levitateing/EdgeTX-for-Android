@@ -1,6 +1,8 @@
 # 二次开发（Contributing）
 
-基于本平台继续开发前请阅读 [NOTICE.md](../NOTICE.md)（GPL-2.0）。
+基于本平台继续开发前请阅读 [NOTICE.md](../NOTICE.md)（GPL-2.0 + **非官方归属**）。
+
+对外表述请保持 *Unofficial / custom branch*，勿暗示官方产品；App 包名保持 `io.github.levitateing.etxandroid`（勿改回 `org.edgetx.*`）。
 
 1. 固定官方 EdgeTX 的 commit，并在 README 中写明。  
 2. 业务改动放在本目录内；必须改共享文件时，只改 `firmware/patches/` 中的副本。  

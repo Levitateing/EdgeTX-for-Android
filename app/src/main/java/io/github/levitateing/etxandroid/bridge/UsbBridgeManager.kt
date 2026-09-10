@@ -1,4 +1,4 @@
-package org.edgetx.ui.bridge
+package io.github.levitateing.etxandroid.bridge
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -403,13 +403,13 @@ class UsbBridgeManager(
         if (port == null || linked.get()) return
         helloAttempts++
         val localSize = runCatching {
-            org.edgetx.ui.NativeSim.nativeGetModelDataSize().toLong()
+            io.github.levitateing.etxandroid.NativeSim.nativeGetModelDataSize().toLong()
         }.getOrDefault(0L)
         val stickMode = runCatching {
-            org.edgetx.ui.NativeSim.nativeGetStickMode()
+            io.github.levitateing.etxandroid.NativeSim.nativeGetStickMode()
         }.getOrDefault(0)
         val templateSetup = runCatching {
-            org.edgetx.ui.NativeSim.nativeGetTemplateSetup()
+            io.github.levitateing.etxandroid.NativeSim.nativeGetTemplateSetup()
         }.getOrDefault(0)
         val frame = AndroidBridgeProto.encodeHello(
             seq.getAndIncrement(), localSize, stickMode, templateSetup
@@ -515,7 +515,7 @@ class UsbBridgeManager(
 
     companion object {
         private const val TAG = "UsbBridge"
-        private const val ACTION_USB_PERMISSION = "org.edgetx.ui.USB_PERMISSION"
+        private const val ACTION_USB_PERMISSION = "io.github.levitateing.etxandroid.USB_PERMISSION"
         private const val WRITE_TIMEOUT_MS = 1500
         private const val PUT_WRITE_TIMEOUT_MS = 5000
         private const val HELLO_INITIAL_DELAY_MS = 300L

@@ -1,4 +1,4 @@
-package org.edgetx.ui.bridge
+package io.github.levitateing.etxandroid.bridge
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

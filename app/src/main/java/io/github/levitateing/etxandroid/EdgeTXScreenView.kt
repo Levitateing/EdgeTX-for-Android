@@ -1,4 +1,4 @@
-package org.edgetx.ui
+package io.github.levitateing.etxandroid
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -16,7 +16,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Fullscreen native EdgeTX LCD view (app-private SD under Android/data/org.edgetx.ui/EdgeTX).
+ * Fullscreen native EdgeTX LCD view (app-private SD under Android/data/io.github.levitateing.etxandroid/EdgeTX).
  */
 class EdgeTXScreenView @JvmOverloads constructor(
     context: Context,

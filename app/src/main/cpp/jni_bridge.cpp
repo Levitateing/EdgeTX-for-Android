@@ -16,7 +16,7 @@ static constexpr jint kAndroidModelDataSize = 0x1deb; /* sizeof(ModelData) RADIO
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetStoragePaths(JNIEnv* env, jclass,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetStoragePaths(JNIEnv* env, jclass,
                                                    jstring sdPath,
                                                    jstring settingsPath) {
   const char* sd = env->GetStringUTFChars(sdPath, nullptr);
@@ -27,14 +27,14 @@ Java_org_edgetx_ui_NativeSim_nativeSetStoragePaths(JNIEnv* env, jclass,
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeLoadAsset(JNIEnv*, jclass, jobject,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeLoadAsset(JNIEnv*, jclass, jobject,
                                              jstring) {
   // Native SIMU is linked into this .so — no WASM asset to load.
   return JNI_TRUE;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeInit(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeInit(JNIEnv*, jclass) {
   std::string err;
   bool ok = EdgeTXHost::instance().init(&err);
   if (!ok) {
@@ -44,7 +44,7 @@ Java_org_edgetx_ui_NativeSim_nativeInit(JNIEnv*, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativePrepareStorage(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativePrepareStorage(JNIEnv*, jclass) {
   std::string err;
   bool ok = EdgeTXHost::instance().prepareStorage(&err);
   if (!ok) {
@@ -54,12 +54,12 @@ Java_org_edgetx_ui_NativeSim_nativePrepareStorage(JNIEnv*, jclass) {
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeCreateDefaults(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeCreateDefaults(JNIEnv*, jclass) {
   simuCreateDefaults();
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeStart(JNIEnv*, jclass, jboolean tests,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeStart(JNIEnv*, jclass, jboolean tests,
                                          jint utcOffset) {
   std::string err;
   bool ok = EdgeTXHost::instance().start(tests, utcOffset, &err);
@@ -70,28 +70,28 @@ Java_org_edgetx_ui_NativeSim_nativeStart(JNIEnv*, jclass, jboolean tests,
 }
 
 JNIEXPORT jstring JNICALL
-Java_org_edgetx_ui_NativeSim_nativeLastError(JNIEnv* env, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeLastError(JNIEnv* env, jclass) {
   const std::string& e = EdgeTXHost::instance().lastError();
   return env->NewStringUTF(e.c_str());
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeStop(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeStop(JNIEnv*, jclass) {
   EdgeTXHost::instance().stop();
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeIsRunning(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeIsRunning(JNIEnv*, jclass) {
   return EdgeTXHost::instance().isRunning() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeHostExitRequested(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeHostExitRequested(JNIEnv*, jclass) {
   return simuHostExitRequested() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeTouch(JNIEnv*, jclass, jint x, jint y,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeTouch(JNIEnv*, jclass, jint x, jint y,
                                          jboolean down) {
   if (down) {
     EdgeTXHost::instance().touchDown((int16_t)x, (int16_t)y);
@@ -101,7 +101,7 @@ Java_org_edgetx_ui_NativeSim_nativeTouch(JNIEnv*, jclass, jint x, jint y,
 }
 
 JNIEXPORT jintArray JNICALL
-Java_org_edgetx_ui_NativeSim_nativeLcdInfo(JNIEnv* env, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeLcdInfo(JNIEnv* env, jclass) {
   auto& h = EdgeTXHost::instance();
   jintArray arr = env->NewIntArray(3);
   jint vals[3] = {(jint)h.lcdWidth(), (jint)h.lcdHeight(), (jint)h.lcdDepth()};
@@ -110,7 +110,7 @@ Java_org_edgetx_ui_NativeSim_nativeLcdInfo(JNIEnv* env, jclass) {
 }
 
 JNIEXPORT jintArray JNICALL
-Java_org_edgetx_ui_NativeSim_nativePollLcdArgb(JNIEnv* env, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativePollLcdArgb(JNIEnv* env, jclass) {
   static thread_local std::vector<uint32_t> argb;
   if (!EdgeTXHost::instance().pollLcdArgb(argb) || argb.empty()) {
     return nullptr;
@@ -123,51 +123,51 @@ Java_org_edgetx_ui_NativeSim_nativePollLcdArgb(JNIEnv* env, jclass) {
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetKey(JNIEnv*, jclass, jint key,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetKey(JNIEnv*, jclass, jint key,
                                           jboolean down) {
   simuSetKey(static_cast<uint8_t>(key), down == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeRotaryEncoderEvent(JNIEnv*, jclass,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeRotaryEncoderEvent(JNIEnv*, jclass,
                                                      jint steps) {
   simuRotaryEncoderEvent(static_cast<int32_t>(steps));
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeIsLuaScriptActive(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeIsLuaScriptActive(JNIEnv*, jclass) {
   return simuIsLuaScriptActive() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetBacklightLevel(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetBacklightLevel(JNIEnv*, jclass) {
   return static_cast<jint>(simuGetBacklightLevel());
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetSpeakerVolume(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetSpeakerVolume(JNIEnv*, jclass) {
   return static_cast<jint>(simuAudioGetVolume());
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetSpeakerVolume(JNIEnv*, jclass,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetSpeakerVolume(JNIEnv*, jclass,
                                                     jint level) {
   if (level < 0) level = 0;
   simuSetSpeakerVolume(static_cast<uint8_t>(level));
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetVolumeMax(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetVolumeMax(JNIEnv*, jclass) {
   return static_cast<jint>(simuGetVolumeMax());
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetHaptic(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetHaptic(JNIEnv*, jclass) {
   return static_cast<jint>(simuGetHaptic());
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetBattery(JNIEnv*, jclass, jint levelPct,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetBattery(JNIEnv*, jclass, jint levelPct,
                                               jboolean plugged,
                                               jboolean charging) {
   const int pct = std::max(0, std::min(100, static_cast<int>(levelPct)));
@@ -192,7 +192,7 @@ Java_org_edgetx_ui_NativeSim_nativeSetBattery(JNIEnv*, jclass, jint levelPct,
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetModelData(JNIEnv* env, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetModelData(JNIEnv* env, jclass) {
   if (!EdgeTXHost::instance().isRunning()) return nullptr;
   jbyteArray out = env->NewByteArray(kAndroidModelDataSize);
   if (!out) return nullptr;
@@ -202,7 +202,7 @@ Java_org_edgetx_ui_NativeSim_nativeGetModelData(JNIEnv* env, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetModelData(JNIEnv* env, jclass,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetModelData(JNIEnv* env, jclass,
                                                 jbyteArray data) {
   if (!EdgeTXHost::instance().isRunning() || !data) return JNI_FALSE;
   const jsize n = env->GetArrayLength(data);
@@ -216,18 +216,18 @@ Java_org_edgetx_ui_NativeSim_nativeSetModelData(JNIEnv* env, jclass,
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetModelDataSize(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetModelDataSize(JNIEnv*, jclass) {
   return kAndroidModelDataSize;
 }
 
 JNIEXPORT jlong JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetModelCrc32(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetModelCrc32(JNIEnv*, jclass) {
   if (!EdgeTXHost::instance().isRunning()) return 0;
   return static_cast<jlong>(simuModelCrc32()) & 0xFFFFFFFFLL;
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetRadioData(JNIEnv* env, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetRadioData(JNIEnv* env, jclass) {
   if (!EdgeTXHost::instance().isRunning()) return nullptr;
   const uint32_t sz = simuGetRadioDataSize();
   jbyteArray out = env->NewByteArray(static_cast<jsize>(sz));
@@ -240,7 +240,7 @@ Java_org_edgetx_ui_NativeSim_nativeGetRadioData(JNIEnv* env, jclass) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetRadioData(JNIEnv* env, jclass,
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetRadioData(JNIEnv* env, jclass,
                                                 jbyteArray data) {
   if (!EdgeTXHost::instance().isRunning() || !data) return JNI_FALSE;
   const jsize n = env->GetArrayLength(data);
@@ -254,37 +254,37 @@ Java_org_edgetx_ui_NativeSim_nativeSetRadioData(JNIEnv* env, jclass,
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetRadioDataSize(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetRadioDataSize(JNIEnv*, jclass) {
   return static_cast<jint>(simuGetRadioDataSize());
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetStickMode(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetStickMode(JNIEnv*, jclass) {
   return static_cast<jint>(simuGetStickMode());
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetStickMode(JNIEnv*, jclass, jint mode) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetStickMode(JNIEnv*, jclass, jint mode) {
   simuSetStickMode(static_cast<uint8_t>(mode & 3));
 }
 
 JNIEXPORT jint JNICALL
-Java_org_edgetx_ui_NativeSim_nativeGetTemplateSetup(JNIEnv*, jclass) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeGetTemplateSetup(JNIEnv*, jclass) {
   return static_cast<jint>(simuGetTemplateSetup());
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetTemplateSetup(JNIEnv*, jclass, jint setup) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetTemplateSetup(JNIEnv*, jclass, jint setup) {
   simuSetTemplateSetup(static_cast<uint8_t>(setup & 0xFF));
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeSetPwrPressed(JNIEnv*, jclass, jboolean pressed) {
+Java_io_github_levitateing_etxandroid_NativeSim_nativeSetPwrPressed(JNIEnv*, jclass, jboolean pressed) {
   simuSetPwrPressed(pressed == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
-Java_org_edgetx_ui_NativeSim_nativeApplyBridgeInput(
+Java_io_github_levitateing_etxandroid_NativeSim_nativeApplyBridgeInput(
     JNIEnv* env, jclass, jshortArray analogsAdc, jbyteArray switchStates,
     jint keysMask, jint trimKeysMask, jshortArray trimValues) {
   auto& host = EdgeTXHost::instance();

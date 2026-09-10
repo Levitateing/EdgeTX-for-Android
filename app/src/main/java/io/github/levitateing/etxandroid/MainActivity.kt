@@ -1,4 +1,4 @@
-package org.edgetx.ui
+package io.github.levitateing.etxandroid
 
 import android.content.Intent
 import android.graphics.Color
@@ -14,13 +14,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import org.edgetx.ui.bridge.AndroidBridgeProto
-import org.edgetx.ui.bridge.ModelPatcher
-import org.edgetx.ui.bridge.UsbBridgeManager
+import io.github.levitateing.etxandroid.bridge.AndroidBridgeProto
+import io.github.levitateing.etxandroid.bridge.ModelPatcher
+import io.github.levitateing.etxandroid.bridge.UsbBridgeManager
 
 /**
  * Hosts the native EdgeTX LCD using app-private SD storage under
- * `/sdcard/Android/data/org.edgetx.ui/EdgeTX`.
+ * `/sdcard/Android/data/io.github.levitateing.etxandroid/EdgeTX`.
  *
  * Also hosts USB Bridge (OTG → radio CDC) for MCU link bring-up.
  */
@@ -370,7 +370,7 @@ class MainActivity : AppCompatActivity() {
         if (!SdCardStore.ensureSeeded(this)) {
             showStorageError(
                 "无法初始化 EdgeTX 存储\n" +
-                    "路径: Android/data/org.edgetx.ui/EdgeTX\n\n" +
+                    "路径: Android/data/io.github.levitateing.etxandroid/EdgeTX\n\n" +
                     "请检查手机存储空间是否充足。"
             )
             return

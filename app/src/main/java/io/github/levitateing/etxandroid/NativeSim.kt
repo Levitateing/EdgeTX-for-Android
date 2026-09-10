@@ -1,4 +1,4 @@
-package org.edgetx.ui
+package io.github.levitateing.etxandroid
 
 import android.content.res.AssetManager
 

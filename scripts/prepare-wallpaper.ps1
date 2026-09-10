@@ -101,5 +101,5 @@ if ($LASTEXITCODE -ne 0) { throw "generate-wallpaper.py failed ($LASTEXITCODE)" 
 
 Write-Host ""
 Write-Host "Done. Copy to phone SD tree if needed:"
-Write-Host "  Android/data/org.edgetx.ui/EdgeTX/THEMES/$Theme/background_${Display}.png"
+Write-Host "  Android/data/io.github.levitateing.etxandroid/EdgeTX/THEMES/$Theme/background_${Display}.png"
 Write-Host "Or rebuild APK to bundle SD-Card-Files into the install package."

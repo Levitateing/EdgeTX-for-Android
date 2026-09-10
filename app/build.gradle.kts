@@ -33,16 +33,16 @@ fun computeSdCardFingerprint(source: File): String {
 }
 
 android {
-    namespace = "org.edgetx.ui"
+    namespace = "io.github.levitateing.etxandroid"
     compileSdk = 35
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "org.edgetx.ui"
+        applicationId = "io.github.levitateing.etxandroid"
         minSdk = 26
         targetSdk = 35
-        versionCode = 56
-        versionName = "0.53.0-bridge"
+        versionCode = 57
+        versionName = "0.53.1-unofficial"
 
         externalNativeBuild {
             cmake {

@@ -2,6 +2,8 @@
 
 本仓库是 **drop-in 平台包**：不包含完整 EdgeTX。你需要官方源码 + 本目录放到正确路径。
 
+**非官方：** 与 EdgeTX 官方无隶属/背书。应用包名 `io.github.levitateing.etxandroid`，桌面名 *ETx Android (Unofficial)*。详见 [../NOTICE.md](../NOTICE.md)。
+
 ## 1. 准备官方 EdgeTX
 
 ```bash
@@ -70,9 +72,10 @@ powershell -NoProfile -File radio\src\targets\android\scripts\build-apk.ps1
 
 ## 5. 安装与运行
 
-- 卸载旧包后安装新 APK  
-- 授予「所有文件访问」等权限（读写 `/sdcard/EdgeTX`）  
-- 可选：将 `SD-Card-Files/` 内容拷到手机 `EdgeTX` 目录作主题/音效/脚本起点  
+- 若曾安装旧包名 **`org.edgetx.ui`**，请先卸载（新包为 **`io.github.levitateing.etxandroid`**，不会自动覆盖）  
+- 安装 `output/EdgeTX.apk`  
+- 应用私有存储目录形如：`Android/data/io.github.levitateing.etxandroid/EdgeTX`  
+- 可选：将 `SD-Card-Files/` 内容拷到该 `EdgeTX` 目录作主题/音效/脚本起点  
 
 ## 6. 注意事项（必读）
 

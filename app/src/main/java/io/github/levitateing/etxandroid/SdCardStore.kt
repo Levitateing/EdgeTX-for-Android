@@ -1,4 +1,4 @@
-package org.edgetx.ui
+package io.github.levitateing.etxandroid
 
 import android.content.Context
 import android.util.Log
@@ -7,7 +7,7 @@ import java.io.File
 /**
  * SD card root for the native FatFS layer.
  *
- * Target path: `/sdcard/Android/data/org.edgetx.ui/EdgeTX`
+ * Target path: `/sdcard/Android/data/io.github.levitateing.etxandroid/EdgeTX`
  *
  * Android 10+ blocks creating `Android/data/<package>/…` via a raw
  * [android.os.Environment.getExternalStorageDirectory] path. The package sandbox
@@ -19,7 +19,7 @@ object SdCardStore {
     const val FOLDER_NAME = "EdgeTX"
 
     /**
-     * Returns `/…/Android/data/org.edgetx.ui/EdgeTX`, creating the package sandbox
+     * Returns `/…/Android/data/io.github.levitateing.etxandroid/EdgeTX`, creating the package sandbox
      * if needed. Returns null when external storage is unavailable or not writable.
      */
     fun sdCardRoot(context: Context): File? {

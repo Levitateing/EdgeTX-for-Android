@@ -1,19 +1,35 @@
-# EdgeTX for Android
+# EdgeTX for Android（非官方 / Unofficial）
+
+> **Unofficial community project — not affiliated with, endorsed by, or part of the [EdgeTX](https://github.com/EdgeTX/edgetx) project.**  
+> **非官方社区项目，与 EdgeTX 官方无隶属、无背书、无合作关系。**  
+> 请勿将本软件标识为官方 EdgeTX；请勿将官方 EdgeTX logo 用于本项目的商业宣传。本仓库是基于 EdgeTX（GPL-2.0）的 **custom / third-party Android UI 平台包**。
 
 在 Android 上运行 EdgeTX 彩屏 UI（`colorlcd` + LVGL），并可与 MCU 经 USB Bridge 联机。
 
 本仓库**只包含**平台目录内容，需配合官方 [EdgeTX/edgetx](https://github.com/EdgeTX/edgetx) 构建完整项目。
 
-本项目在Windows11环境下开发，AI代码含量百分百，仅供学习交流使用，本人不对任何非正常情况负责。
+本维护副本对照上游（建议你也固定同一 commit）：
+
+```text
+96ab2745d1bc0025c5508ac8a3b862f34cf97c6e
+```
+
+本项目在 Windows 11 环境下开发；**全部代码由 AI 生成**（维护者未手写业务代码），仅供学习交流。使用、刷机与飞行风险自负；本人不对任何非正常情况负责。
+
+**应用包名（applicationId）：** `io.github.levitateing.etxandroid`  
+（刻意不使用 `org.edgetx.*`，避免被误认为官方 App。若曾安装旧包 `org.edgetx.ui`，请先卸载再装新 APK。）
+
+桌面显示名：**ETx Android (Unofficial)**。
 
 ---
 
 ## 快速开始
 
 ```bash
-# 1. 官方固件树（建议固定到你验证过的 commit）
+# 1. 官方固件树（建议固定到上面的 commit）
 git clone https://github.com/EdgeTX/edgetx.git
 cd edgetx
+git checkout 96ab2745d1bc0025c5508ac8a3b862f34cf97c6e
 
 # 2. 放入本平台包
 git clone https://github.com/Levitateing/EdgeTX-for-Android.git radio/src/targets/android
@@ -37,7 +53,6 @@ cd radio/src/targets/android
 首次编 APK：确认已装 Python → 打开 `Build-EdgeTX-GUI.pyw` → **安装缺失项** → 分辨率默认 **2400×1440**（可改）→ 开始编译。
 
 其它启动项与 `scripts/` 内脚本说明见 [docs/TOOLS.md](docs/TOOLS.md)。环境与注意点见 [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)、[docs/TOOLCHAIN.md](docs/TOOLCHAIN.md)。
-
 
 ---
 
@@ -67,6 +82,6 @@ cd radio/src/targets/android
 | [docs/MCU-BRIDGE.md](docs/MCU-BRIDGE.md) | App ↔ MCU Bridge |
 | [docs/PROJECT-STATUS.md](docs/PROJECT-STATUS.md) | 阶段与版本演进 |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | 二次开发建议 |
-| [NOTICE.md](NOTICE.md) | 许可证说明（GPL-2.0） |
+| [NOTICE.md](NOTICE.md) | 许可证与商标/归属说明（GPL-2.0） |
 
-License: [GPL-2.0](LICENSE)（与 EdgeTX 一致）
+License: [GPL-2.0](LICENSE)（与 EdgeTX 软件许可一致；名称与商标另见 [NOTICE.md](NOTICE.md)）
