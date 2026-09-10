@@ -1,0 +1,690 @@
+/*
+ * Copyright (C) EdgeTX
+ *
+ * Based on code named
+ *   opentx - https://github.com/opentx/opentx
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "hal/adc_driver.h"
+#include "hal/storage.h"
+#include "hal/abnormal_reboot.h"
+#include "hal/usb_driver.h"
+#include "hal/audio_driver.h"
+
+#include "edgetx.h"
+#include "lua/lua_states.h"
+#include "serial.h"
+
+#if defined(COLORLCD)
+#include "view_main.h"
+#include "startup_shutdown.h"
+#include "theme_manager.h"
+#include "etx_lv_theme.h"
+#include "menu.h"
+#include "mainwindow.h"
+#endif
+
+#if defined(CLI)
+#include "cli.h"
+#endif
+
+#if defined(LUA)
+#include "lua/lua_event.h"
+#endif
+
+#if defined(AUDIO)
+uint8_t currentSpeakerVolume = 255;
+uint8_t requiredSpeakerVolume = 255;
+#if defined(AUDIO_HP_DETECT_PIN)
+bool hpDetected = false;
+#endif
+#endif
+
+uint8_t currentBacklightBright = 0;
+uint8_t requiredBacklightBright = 0;
+
+static bool _usbDisabled = false;
+
+#if defined(COLORLCD)
+static Menu* _usbMenu = nullptr;
+
+void closeUsbMenu()
+{
+  if (_usbMenu) {
+    // Force-close when App HELLO locks VCP, or when USB was unplugged.
+    _usbMenu->deleteLater();
+    _usbMenu = nullptr;
+  }
+}
+
+void openUsbMenu()
+{
+  if (_usbMenu || _usbDisabled) return;
+
+  _usbMenu = new Menu();
+
+  _usbMenu->setCloseHandler([]() { _usbMenu = nullptr; });
+
+  _usbMenu->setCancelHandler([]() {
+    if (usbPlugged() && (getSelectedUsbMode() == USB_UNSELECTED_MODE)) {
+      TRACE("disable USB");
+      _usbDisabled = true;
+    }
+  });
+
+  _usbMenu->setTitle("USB");
+  _usbMenu->addLine(STR_USB_JOYSTICK, [] {
+    TRACE("USB set joystick");
+#if defined(RADIO_ANDROID) && !defined(SIMU)
+    if (usbStarted() && getSelectedUsbMode() != USB_JOYSTICK_MODE) {
+#if defined(USB_SERIAL)
+      if (getSelectedUsbMode() == USB_SERIAL_MODE) serialStop(SP_VCP);
+#endif
+      usbStop();
+    }
+#endif
+    setSelectedUsbMode(USB_JOYSTICK_MODE);
+  });
+  _usbMenu->addLine(STR_USB_MASS_STORAGE, [] {
+    TRACE("USB mass storage");
+#if defined(RADIO_ANDROID) && !defined(SIMU)
+    if (usbStarted() && getSelectedUsbMode() != USB_MASS_STORAGE_MODE) {
+#if defined(USB_SERIAL)
+      if (getSelectedUsbMode() == USB_SERIAL_MODE) serialStop(SP_VCP);
+#endif
+      usbStop();
+    }
+#endif
+    setSelectedUsbMode(USB_MASS_STORAGE_MODE);
+  });
+#if defined(USB_SERIAL)
+  _usbMenu->addLine(STR_USB_SERIAL, [] {
+    TRACE("USB serial");
+#if defined(RADIO_ANDROID) && !defined(SIMU)
+    if (usbStarted() && getSelectedUsbMode() != USB_SERIAL_MODE) {
+      usbStop();
+    }
+#endif
+    setSelectedUsbMode(USB_SERIAL_MODE);
+  });
+#endif
+}
+
+#else
+
+void onUSBConnectMenu(const char *result)
+{
+  if (result == STR_USB_MASS_STORAGE) {
+    setSelectedUsbMode(USB_MASS_STORAGE_MODE);
+  } else if (result == STR_USB_JOYSTICK) {
+    setSelectedUsbMode(USB_JOYSTICK_MODE);
+  }
+#if defined(USB_SERIAL)
+  else if (result == STR_USB_SERIAL) {
+    setSelectedUsbMode(USB_SERIAL_MODE);
+  }
+#endif
+  else if (result == STR_EXIT) {
+    _usbDisabled = true;
+  }
+}
+
+void openUsbMenu()
+{
+  if (popupMenuHandler != onUSBConnectMenu) {
+    POPUP_MENU_TITLE(STR_SELECT_MODE);
+#if defined(USB_SERIAL)
+    POPUP_MENU_START(onUSBConnectMenu, 3, STR_USB_JOYSTICK, STR_USB_MASS_STORAGE, STR_USB_SERIAL);
+#else
+    POPUP_MENU_START(onUSBConnectMenu, 2, STR_USB_JOYSTICK, STR_USB_MASS_STORAGE);
+#endif
+  }
+}
+
+void closeUsbMenu()
+{
+  CLEAR_POPUP();
+}
+
+#endif
+
+#if defined(COLORLCD)
+class UsbSDConnected : public Window
+{
+ public:
+  UsbSDConnected() : Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H})
+  {
+    setWindowFlag(OPAQUE);
+
+    pushLayer(false);
+
+    etx_solid_bg(lvobj, COLOR_THEME_PRIMARY1_INDEX);
+    new HeaderDateTime(this, LCD_W - TopBar::HDR_DATE_XO, PAD_MEDIUM);
+
+    auto icon = new StaticIcon(this, 0, 0, ICON_USB_PLUGGED, COLOR_THEME_PRIMARY2_INDEX);
+    lv_obj_center(icon->getLvObj());
+  }
+};
+
+static UsbSDConnected* usbConnectedWindow = nullptr;
+#endif
+
+void handleUsbConnection()
+{
+#if defined(STM32) && !defined(SIMU)
+
+  static bool _pluggedUsb = false;
+
+  if (_pluggedUsb && !usbPlugged()) {
+    TRACE("USB unplugged");
+    closeUsbMenu();
+    _pluggedUsb = false;
+#if defined(USB_CHARGE_CONTROL)
+    usbChargerEnableCharge(true);
+#endif
+  } else if (!_pluggedUsb && usbPlugged()) {
+    TRACE("USB plugged");
+    _pluggedUsb = true;
+    _usbDisabled = false;
+#if defined(USB_CHARGE_CONTROL)
+    // Apply on plug, not on usbStart(): the mode popup can sit open for a long
+    // time and the radio would charge until a mode is picked
+    usbChargerEnableCharge(!g_eeGeneral.usbChargeDisabled);
+#endif
+  }
+
+  if (!_usbDisabled && !usbStarted() && usbPlugged()) {
+    if (getSelectedUsbMode() == USB_UNSELECTED_MODE) {
+      if (g_eeGeneral.USBMode == USB_UNSELECTED_MODE) {
+#if defined(RADIO_ANDROID) && defined(USB_SERIAL)
+        // Ask-on-connect: bring up VCP immediately so the phone App can HELLO,
+        // and still show the mode menu so a PC user can switch to MSC/Joystick.
+        setSelectedUsbMode(USB_SERIAL_MODE);
+        openUsbMenu();
+#else
+        openUsbMenu();
+#endif
+      } else {
+        setSelectedUsbMode(g_eeGeneral.USBMode);
+      }
+    }
+
+    // Mode might have been selected in previous block
+    // so re-evaluate the condition
+    if (getSelectedUsbMode() != USB_UNSELECTED_MODE) {
+      if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
+        edgeTxClose(false);
+#if defined(COLORLCD)
+        usbConnectedWindow = new UsbSDConnected();
+#endif
+      }
+#if defined(USB_SERIAL)
+      else if (getSelectedUsbMode() == USB_SERIAL_MODE) {
+        serialInit(SP_VCP, serialGetMode(SP_VCP));
+      }
+#endif
+
+      usbStart();
+      TRACE("USB started");
+    }
+  }
+
+  if (usbStarted() && !usbPlugged()) {
+    usbStop();
+    TRACE("USB stopped");
+    if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
+#if defined(COLORLCD)
+      usbConnectedWindow->deleteLater();
+      usbConnectedWindow = nullptr;
+      // In case the SD card is removed during the session
+      if (!SD_CARD_PRESENT()) {
+        // Blocks until shutdown or SD card inserted
+        auto w = drawFatalErrorScreen(STR_NO_SDCARD);
+        MainWindow::instance()->blockUntilClose(true, []() {
+          return SD_CARD_PRESENT();
+        }, true);
+        w->deleteLater();
+      }
+      edgeTxResume();
+#else
+      edgeTxResume();
+      pushEvent(EVT_ENTRY);
+#endif
+    } else if (getSelectedUsbMode() == USB_SERIAL_MODE) {
+      serialStop(SP_VCP);
+    }
+    TRACE("reset selected USB mode");
+    setSelectedUsbMode(USB_UNSELECTED_MODE);
+  }
+#endif  // defined(STM32) && !defined(SIMU)
+}
+
+void checkSpeakerVolume()
+{
+#if defined(AUDIO_HP_DETECT_PIN)
+  // volume needs to be set on plug/unplug to set the the right volume on each device
+  if (hpDetected != audioHeadphoneDetect()) {
+    hpDetected = !hpDetected;
+    audioSetVolume(currentSpeakerVolume);
+  }
+#endif
+#if defined(AUDIO)
+  if (currentSpeakerVolume != requiredSpeakerVolume) {
+    currentSpeakerVolume = requiredSpeakerVolume;
+#if !defined(SOFTWARE_VOLUME)
+    audioSetVolume(currentSpeakerVolume);
+#endif
+  }
+#endif
+}
+
+#if defined(USE_HATS_AS_KEYS)
+void checkHatsAsKeys()
+{
+  uint8_t hatsMode = g_model.hatsMode == HATSMODE_GLOBAL ? g_eeGeneral.hatsMode
+                                                         : g_model.hatsMode;
+
+  static bool oldHatsModeKeys = hatsMode == HATSMODE_KEYS_ONLY;
+
+  if (hatsMode == HATSMODE_TRIMS_ONLY) {
+    setHatsAsKeys(false);
+  }
+
+  if (hatsMode == HATSMODE_KEYS_ONLY) {
+    setHatsAsKeys(true);
+  }
+
+  bool hatsModeKeys = getHatsAsKeys();
+
+  if (hatsModeKeys == oldHatsModeKeys) return;
+
+  oldHatsModeKeys = !oldHatsModeKeys;
+
+  audioKeyPress();
+  POPUP_BUBBLE(hatsModeKeys ? STR_HATSMODE_KEYS : STR_HATSMODE_TRIMS, 2000);
+}
+#endif
+
+#if !defined(COLORLCD)
+// Tick count at which to clear our key-lock message. 0 = no message active.
+static tmr10ms_t s_keysLockMsgUntil = 0;
+static const char* s_keysLockMsg = nullptr;
+static const char* s_keysLockInfo = nullptr;
+#endif
+
+void checkKeysLock()
+{
+  if (consumeKeysLockToggleEvent()) {
+    audioKeyPress();
+    const char* lockedMsg = STR_KEYS_LOCKED;
+#if defined(KEYS_LOCK_KEY1) && defined(KEYS_LOCK_KEY2)
+    static char lockedBuf[45];
+    const char* k1 = keysGetLabel((EnumKeys)KEYS_LOCK_KEY1);
+    const char* k2 = keysGetLabel((EnumKeys)KEYS_LOCK_KEY2);
+    snprintf(lockedBuf, sizeof(lockedBuf), STR_KEYS_LOCKED_FMT,
+             k1 ? k1 : "?", k2 ? k2 : "?");
+    lockedMsg = lockedBuf;
+#endif
+#if defined(COLORLCD)
+    POPUP_BUBBLE(areKeysLocked() ? lockedMsg : STR_KEYS_UNLOCKED, 1500);
+#else
+    // Can't use a modal POPUP_INFORMATION: keys may be locked, so the user
+    // couldn't dismiss it. Keep our own deadline and re-arm POPUP_WAIT every
+    // tick below — that survives other code clearing warningText (e.g. the
+    // GVAR display in view_main.cpp).
+    s_keysLockMsg = areKeysLocked() ? STR_KEYS_LOCKED : STR_KEYS_UNLOCKED;
+    s_keysLockInfo = areKeysLocked() ? lockedMsg : nullptr;
+    s_keysLockMsgUntil = get_tmr10ms() + 150;
+#endif
+  }
+
+#if !defined(COLORLCD)
+  if (s_keysLockMsgUntil) {
+    if ((int32_t)(get_tmr10ms() - s_keysLockMsgUntil) >= 0) {
+      s_keysLockMsgUntil = 0;
+      // Only clear if our message is still the active one; another popup
+      // may have replaced it in the meantime.
+      if (warningText == s_keysLockMsg) CLEAR_POPUP();
+      s_keysLockMsg = nullptr;
+      s_keysLockInfo = nullptr;
+    } else {
+      // Keep the popup fresh every tick — another path (GVAR, etc.) may
+      // have cleared warningText; just re-arm it.
+      POPUP_WAIT(s_keysLockMsg, s_keysLockInfo);
+    }
+  }
+#endif
+}
+
+void checkStorageUpdate()
+{
+#if defined(RTC_BACKUP_RAM) && !defined(SIMU)
+  if (TIME_TO_BACKUP_RAM()) {
+    if (!UNEXPECTED_SHUTDOWN()) {
+      rambackupWrite();
+    }
+    rambackupDirtyMsk = 0;
+  }
+#endif
+  if (TIME_TO_WRITE()) {
+    storageCheck(false);
+  }
+}
+
+#define BAT_AVG_SAMPLES 8
+
+void checkBatteryAlarms()
+{
+  // TRACE("checkBatteryAlarms()");
+  if (IS_TXBATT_WARNING()) {
+    AUDIO_TX_BATTERY_LOW();
+    // TRACE("checkBatteryAlarms(): battery low");
+  }
+}
+
+void checkBattery()
+{
+  static uint32_t batSum;
+  static uint8_t sampleCount;
+  // filter battery voltage by averaging it
+  if (g_vbat100mV == 0) {
+    g_vbat100mV = (getBatteryVoltage() + 5) / 10;
+    batSum = 0;
+    sampleCount = 0;
+  } else {
+    batSum += getBatteryVoltage();
+    // TRACE("checkBattery(): sampled = %d", getBatteryVoltage());
+    if (++sampleCount >= BAT_AVG_SAMPLES) {
+      g_vbat100mV = (batSum + BAT_AVG_SAMPLES * 5) / (BAT_AVG_SAMPLES * 10);
+      batSum = 0;
+      sampleCount = 0;
+      // TRACE("checkBattery(): g_vbat100mV = %d", g_vbat100mV);
+    }
+  }
+}
+
+void periodicTick_1s() { checkBattery(); }
+
+void periodicTick_10s()
+{
+  checkBatteryAlarms();
+#if defined(LUA)
+  checkLuaMemoryUsage();
+#endif
+}
+
+void periodicTick()
+{
+  static uint8_t count10s;
+  static uint32_t lastTime;
+  if ((get_tmr10ms() - lastTime) >= 100) {
+    lastTime += 100;
+    periodicTick_1s();
+    if (++count10s >= 10) {
+      count10s = 0;
+      periodicTick_10s();
+    }
+  }
+}
+
+#if defined(GUI) && defined(COLORLCD)
+static LAYOUT_VAL_SCALED(GV_POPUP_WIDTH, 200)
+
+void guiMain(event_t evt)
+{
+#if defined(LUA)
+  uint32_t t0 = get_tmr10ms();
+  uint16_t interval = (lastLuaTime == 0 ? 0 : (t0 - lastLuaTime));
+  lastLuaTime = t0;
+  if (interval > maxLuaInterval) {
+    maxLuaInterval = interval;
+  }
+
+  luaDoGc(lsWidgets, false);
+
+  DEBUG_TIMER_START(debugTimerLua);
+  luaTask(false);
+  DEBUG_TIMER_STOP(debugTimerLua);
+
+  t0 = get_tmr10ms() - t0;
+  if (t0 > maxLuaDuration) {
+    maxLuaDuration = t0;
+  }
+#endif
+
+  // For color screens show a popup deferred from another task
+  show_ui_popup();
+  // Show GVAR popup
+  if (gvarDisplayTimer > 0) {
+    char s[30], *p;
+    p = strAppendStringWithIndex(s, STR_GV, gvarLastChanged + 1);
+    p = strAppend(p, " ", 1);
+    p = strAppend(p, g_model.gvars[gvarLastChanged].name, LEN_GVAR_NAME);
+    p = strAppend(p, " = ", 3);
+    p = strAppendSigned(p, GVAR_VALUE(gvarLastChanged, getGVarFlightMode(mixerCurrentFlightMode, gvarLastChanged)));
+    POPUP_BUBBLE(s, gvarDisplayTimer * 10, GV_POPUP_WIDTH);
+    gvarDisplayTimer = 0;
+  }
+}
+#elif defined(GUI)
+
+bool handleGui(event_t event)
+{
+  bool refreshNeeded;
+#if defined(LUA)
+  bool isTelemView =
+      menuHandlers[menuLevel] == menuViewTelemetry &&
+      TELEMETRY_SCREEN_TYPE(selectedTelemView) == TELEMETRY_SCREEN_TYPE_SCRIPT;
+  bool isStandalone = scriptInternalData[0].reference == SCRIPT_STANDALONE;
+  if ((isTelemView || isStandalone) && event) {
+    luaPushEvent(event);
+  }
+  refreshNeeded = luaTask(true);
+  if (isTelemView)
+    menuHandlers[menuLevel](event);
+  else if (scriptInternalData[0].reference != SCRIPT_STANDALONE)
+#endif
+  // No foreground Lua script is running - clear the screen show normal menu
+  {
+    lcdClear();
+    menuHandlers[menuLevel](event);
+    drawStatusLine();
+    refreshNeeded = true;
+  }
+  return refreshNeeded;
+}
+
+void guiMain(event_t evt)
+{
+  bool refreshNeeded = menuEvent || warningText || (popupMenuItemsCount > 0);
+#if defined(LUA)
+  // TODO better lua stopwatch
+  uint32_t t0 = get_tmr10ms();
+  uint16_t interval = (lastLuaTime == 0 ? 0 : (t0 - lastLuaTime));
+  lastLuaTime = t0;
+  if (interval > maxLuaInterval) {
+    maxLuaInterval = interval;
+  }
+
+  // run Lua scripts that don't use LCD (to use CPU time while LCD DMA is
+  // running)
+  luaTask(false);
+
+  t0 = get_tmr10ms() - t0;
+  if (t0 > maxLuaDuration) {
+    maxLuaDuration = t0;
+  }
+#endif  // #if defined(LUA)
+
+  // wait for LCD DMA to finish before continuing, because code from this point
+  // is allowed to change the contents of LCD buffer
+  //
+  // WARNING: make sure no code above this line does any change to the LCD
+  // display buffer!
+  //
+  lcdRefreshWait();
+
+  if (menuEvent) {
+    // we have a popupMenuActive entry or exit event
+    if (menuEvent == EVT_ENTRY_UP) {
+      menuVerticalPosition = menuVerticalPositions[menuLevel];
+      menuVerticalOffset = menuVerticalOffsets[menuLevel];
+    } else {
+      menuVerticalPosition = 0;
+      menuVerticalOffset = 0;
+    }
+
+    menuHorizontalPosition = 0;
+    evt = menuEvent;
+    menuEvent = 0;
+  }
+
+  if (isEventCaughtByPopup()) {
+    refreshNeeded |= handleGui(0);
+  } else {
+    refreshNeeded |= handleGui(evt);
+    evt = 0;
+  }
+
+  if (warningText) {
+    // show warning on top of the normal menus
+    DISPLAY_WARNING(evt);
+  } else if (popupMenuItemsCount > 0) {
+    // show popup menu on top of the normal menus
+    const char *result = runPopupMenu(evt);
+    if (result) {
+      TRACE("popupMenuHandler(%s)", result);
+      auto handler = popupMenuHandler;
+      if (result != STR_UPDATE_LIST) CLEAR_POPUP();
+      handler(result);
+    }
+  }
+
+  if (refreshNeeded) lcdRefresh();
+}
+#endif
+
+// from logs.cpp
+void initLoggingTimer();
+
+void perMain()
+{
+  DEBUG_TIMER_START(debugTimerPerMain1);
+
+  checkSpeakerVolume();
+
+  if (!usbPlugged() || (getSelectedUsbMode() == USB_UNSELECTED_MODE)) {
+    checkStorageUpdate();
+    initLoggingTimer();  // initialize software timer for logging
+  }
+
+  handleUsbConnection();
+
+#if defined(SHARED_DSC_HEADPHONE_JACK)
+  handleJackConnection();
+#endif
+
+  checkTrainerSettings();
+  periodicTick();
+  DEBUG_TIMER_STOP(debugTimerPerMain1);
+
+  checkBacklight();
+
+#if defined(USE_HATS_AS_KEYS)
+  checkHatsAsKeys();
+#endif
+
+  checkKeysLock();
+
+#if defined(COLORLCD)
+  MainWindow::instance()->run();
+#endif
+
+#if defined(RTC_BACKUP_RAM)
+  if (UNEXPECTED_SHUTDOWN()) {
+#if defined(COLORLCD)
+    backlightEnable(BACKLIGHT_LEVEL_MAX);
+#else
+    lcdClear();
+    menuMainView(0);
+    lcdRefresh();
+#endif
+    return;
+  }
+#endif
+
+  if (!usbPlugged() || (getSelectedUsbMode() == USB_UNSELECTED_MODE)) {
+    if (SD_CARD_PRESENT() && !sdMounted())
+      sdMount();
+
+    // In case the SD card is removed during the session
+    if (!SD_CARD_PRESENT()) {
+      // TODO: implement for b/w
+    }
+  }
+
+  if (usbPlugged() && getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
+#if !defined(COLORLCD)
+    // disable access to menus
+    lcdClear();
+    menuMainView(0);
+    lcdRefresh();
+#endif
+    return;
+  }
+
+#if defined(MULTIMODULE)
+  checkFailsafeMulti();
+#endif
+
+#if !defined(COLORLCD)
+  event_t evt = getEvent();
+#endif
+
+#if defined(KEYS_GPIO_REG_BIND) && defined(BIND_KEY)
+  bindButtonHandler(evt);
+#endif
+
+  if (radioGFEnabled())
+    evalUIFunctions(g_eeGeneral.customFn, globalFunctionsContext);
+  if (modelSFEnabled())
+    evalUIFunctions(g_model.customFn, modelFunctionsContext);
+
+#if defined(GUI)
+  DEBUG_TIMER_START(debugTimerGuiMain);
+#if defined(COLORLCD)
+  guiMain(0);
+#else
+  guiMain(evt);
+#endif
+  DEBUG_TIMER_STOP(debugTimerGuiMain);
+#endif
+
+#if defined(PCBX9E) && !defined(SIMU)
+  toplcdRefreshStart();
+  setTopFirstTimer(getValue(MIXSRC_FIRST_TIMER + g_model.toplcdTimer));
+  setTopSecondTimer(g_eeGeneral.globalTimer + sessionTimer);
+  setTopRssi(TELEMETRY_RSSI());
+  setTopBatteryValue(g_vbat100mV);
+  setTopBatteryState(GET_TXBATT_BARS(10), IS_TXBATT_WARNING());
+  toplcdRefreshEnd();
+#endif
+
+#if defined(INTERNAL_GPS)
+  gpsWakeup();
+#endif
+}

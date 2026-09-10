@@ -1,0 +1,148 @@
+/*
+ * Copyright (C) EdgeTX
+ *
+ * Based on code named
+ *   opentx - https://github.com/opentx/opentx
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#pragma once
+
+#if !defined(BOOT)
+#include "datastructs_private.h"
+
+#if !defined(BACKUP)
+/* Compile time check to test structure size has not changed *
+   Changing the size of one of the eeprom structs may cause wrong data to
+   be loaded. Error out if the struct size changes.
+   This function tries not avoid checking or using the defines
+   other than the CPU arch and board type so changes in other
+   defines also trigger the struct size changes */
+
+#include "chksize.h"
+
+#define CHKSIZE(x, y) check_size<struct x, y>()
+#define CHKTYPE(x, y) check_size<x, y>()
+
+static inline void check_struct()
+{
+  CHKSIZE(CurveRef, 2);
+  CHKSIZE(VarioData, 5);
+  CHKSIZE(MixData, 20);
+  CHKSIZE(ExpoData, 18);
+  CHKSIZE(SwashRingData, 8);
+  CHKSIZE(CurveHeader, 4);
+  CHKSIZE(LogicalSwitchData, 9);
+  CHKSIZE(TelemetrySensor, 14);
+  CHKSIZE(ModuleData, 29);
+  CHKSIZE(GVarData, 7);
+  CHKSIZE(RFAlarmData, 2);
+  CHKSIZE(TrainerData, 16);
+  CHKSIZE(FlightModeData, 4 + 2 * MAX_GVARS + 2 * MAX_TRIMS + LEN_FLIGHT_MODE_NAME);
+  CHKSIZE(CustomFunctionData, 11);
+
+#if defined(PCBX7) || defined(PCBXLITE) || defined(PCBX9LITE)
+  CHKSIZE(LimitData, 11);
+  CHKSIZE(TimerData, 12);
+  CHKSIZE(FrSkyBarData, 6);
+  CHKSIZE(FrSkyLineData, 4);
+  CHKTYPE(TelemetryScreenData, 24);
+  CHKSIZE(ModelHeader, 12);
+#elif defined(PCBTARANIS)
+  CHKSIZE(LimitData, 13);
+  CHKSIZE(TimerData, 17);
+  CHKSIZE(FrSkyBarData, 6);
+  CHKSIZE(FrSkyLineData, 6);
+  CHKTYPE(TelemetryScreenData, 24);
+  CHKSIZE(ModelHeader, 24);
+#elif defined(RADIO_ANDROID)
+  CHKSIZE(LimitData, 13);
+  CHKSIZE(TimerData, 17);
+  CHKSIZE(ModelHeader, 148);
+#elif defined(COLORLCD)
+  CHKSIZE(LimitData, 13);
+  CHKSIZE(TimerData, 17);
+  CHKSIZE(ModelHeader, 131);
+#else
+  #error CHKSIZE not set up
+#endif
+
+#if defined(PCBXLITES)
+  CHKSIZE(RadioData, 951);
+#elif defined(RADIO_ANDROID)
+  CHKSIZE(RadioData, 1183);
+#elif defined(RADIO_ST16) || defined(PCBPA01) || defined(RADIO_TX15) || defined(RADIO_GX15) || defined(RADIO_T15PRO) || defined(RADIO_TX16SMK3) || defined(RADIO_T22)
+  CHKSIZE(RadioData, 1183);
+#elif defined(RADIO_V12)
+  CHKSIZE(RadioData, 1180);
+#elif defined(COLORLCD)
+  #if defined(IMU)
+    CHKSIZE(RadioData, 1063);
+  #else
+    CHKSIZE(RadioData, 1062);
+  #endif
+#elif defined(RADIO_GX12)
+  CHKSIZE(RadioData, 1068);
+#else
+  CHKSIZE(RadioData, 948);
+#endif
+
+#if defined(RADIO_TPRO) || defined(RADIO_TPROV2) || defined(RADIO_BUMBLEBEE)
+  CHKSIZE(ModelData, 6355);
+#elif defined(RADIO_FAMILY_T20)
+  CHKSIZE(ModelData, 6391);
+#elif defined(RADIO_GX12)
+  CHKSIZE(ModelData, 6419);
+#elif defined(PCBX9E)
+  CHKSIZE(ModelData, 6771);
+#elif defined(PCBX9D) || defined(PCBX9DP)
+  CHKSIZE(ModelData, 6770);
+#elif defined(PCBX7) || defined(PCBXLITE) || defined(PCBX9LITE) || defined(RADIO_T14) || defined(RADIO_T12MAX)
+  CHKSIZE(ModelData, 6329);
+#elif defined(PCBPL18)
+  #if defined(RADIO_NB4P) || defined(RADIO_NV14_FAMILY)
+    CHKSIZE(ModelData, 6875);
+  #else
+    CHKSIZE(ModelData, 6877);
+  #endif
+#elif defined(PCBST16) || defined(RADIO_T15PRO) || defined(RADIO_TX15) || defined(RADIO_GX15)
+  CHKSIZE(ModelData, 7641);
+#elif defined(RADIO_V12)
+  CHKSIZE(ModelData, 7640);
+#elif defined(PCBC14)
+  CHKSIZE(ModelData, 7573);
+#elif defined(PCBPA01)
+  CHKSIZE(ModelData, 7582);
+#elif defined(RADIO_T15)
+  CHKSIZE(ModelData, 6867);
+#elif defined(RADIO_T22)
+  CHKSIZE(ModelData, 7641);
+#elif defined(RADIO_ANDROID)
+  CHKSIZE(ModelData, 7659);
+#elif defined(RADIO_TX16SMK3)
+  CHKSIZE(ModelData, 7642);
+#elif defined(RADIO_H7RS)
+  // CHKSIZE()
+#elif defined(PCBHORUS)
+  CHKSIZE(ModelData, 6841);
+#else
+  #error CHKSIZE not set up
+#endif
+
+#undef CHKSIZE
+}
+#endif /* BACKUP */
+#endif /* !BOOT */

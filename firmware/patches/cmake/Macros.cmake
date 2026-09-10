@@ -1,0 +1,222 @@
+find_package(Git)
+
+macro(git_id RESULT)
+  set(${RESULT} 0)
+  if (GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    execute_process(COMMAND "${GIT_EXECUTABLE}" "--git-dir=${PROJECT_SOURCE_DIR}/.git" "rev-parse" "--short=8" "HEAD" OUTPUT_VARIABLE proc_out ERROR_VARIABLE proc_err)
+    if(proc_err)
+      message(WARNING "Git failed with error: ${proc_err}")
+    else()
+      string(REGEX REPLACE "(.*)\n" "\\1" ${RESULT} ${proc_out})
+    endif()
+  elseif(NOT GIT_FOUND)
+    message(WARNING "Git executable not found, revision number not available.")
+  else()
+    message(STATUS "Git repository not found, revision number not available.")
+  endif()
+endmacro(git_id)
+
+
+macro(PrintTargetReport targetName)
+  if(CMAKE_CXX_COMPILER MATCHES "/(clang-)?cl\\.exe$")
+    set(cpp_version ${CMAKE_CXX_COMPILER_VERSION})
+  else()
+    execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE cpp_version)
+  endif()
+  if(cpp_version)
+    string(STRIP "v${cpp_version}" cpp_version)
+  else()
+    set(cpp_version "WARNING: COMPILER NOT FOUND!")
+  endif()
+  message("TARGET ${targetName}: cpp compiler ${CMAKE_CXX_COMPILER} ${cpp_version}")
+
+  if(VERBOSE_CMAKELISTS)
+    get_directory_property(DirOpts COMPILE_OPTIONS)
+    get_directory_property(DirDefs COMPILE_DEFINITIONS)
+    string(REPLACE ";" " " DirOpts "${DirOpts}")
+    string(REPLACE ";" "; " DirDefs "${DirDefs}")
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" build_type)
+    message("\twith cpp flags: ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${build_type}} ${DirOpts}")
+    message("\twith link flags: ${CMAKE_EXE_LINKER_FLAGS}")
+    message("\twith defs: ${DirDefs}")
+    message("--------------")
+  endif()
+endmacro(PrintTargetReport)
+
+function(AddCompilerFlags output)
+  get_property(flags DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY COMPILE_DEFINITIONS)
+  foreach(flag ${flags})
+    set(ARGS ${ARGS} -D${flag})
+  endforeach()
+
+  get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+  foreach(dir ${dirs})
+    set(ARGS ${ARGS} -I${dir})
+  endforeach()
+
+  # Add hotfix for arm64
+
+  set(${output} ${${output}} ${ARGS} PARENT_SCOPE)
+endfunction()
+
+function(GenerateDatacopy source output)
+
+  set(GEN_DATACOPY ${RADIO_DIRECTORY}/util/generate_datacopy.py)
+  set(GEN_DATACOPY_DEPEND
+    ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${GEN_DATACOPY}
+    ${CMAKE_CURRENT_BINARY_DIR}/hal_settings.h)
+
+  # Fetch defines / include directories in use
+  AddCompilerFlags(GEN_DATACOPY_ARGS)
+
+  # Hack to get rid of warnings in StdPeriph lib
+
+  set(GEN_DATACOPY_ARGS
+    # source file MUST be the first argument
+    ${CMAKE_CURRENT_SOURCE_DIR}/${source}
+    -DBACKUP ${GEN_DATACOPY_ARGS} ${SYSROOT_ARG})
+
+  if(ANDROID)
+    # libclang on Windows cannot mix NDK sysroot with MSVC headers reliably.
+    # Use WASI SDK sysroot for struct-layout codegen (same datastructs).
+    set(_WASI_SDK "")
+    if(DEFINED ENV{WASI_SDK_PATH})
+      set(_WASI_SDK "$ENV{WASI_SDK_PATH}")
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/radio/src/targets/android/.tools/wasi-sdk-25.0")
+      set(_WASI_SDK "${CMAKE_SOURCE_DIR}/radio/src/targets/android/.tools/wasi-sdk-25.0")
+    endif()
+    if(_WASI_SDK)
+      set(_wasi_sysroot "${_WASI_SDK}/share/wasi-sysroot")
+      file(GLOB _wasi_clang_dirs LIST_DIRECTORIES true
+        "${_WASI_SDK}/lib/clang/*")
+      list(APPEND GEN_DATACOPY_ARGS -isysroot ${_wasi_sysroot})
+      list(APPEND GEN_DATACOPY_ARGS -I${_wasi_sysroot}/include/wasm32-wasi)
+      list(APPEND GEN_DATACOPY_ARGS -I${_wasi_sysroot}/include)
+      if(_wasi_clang_dirs)
+        list(GET _wasi_clang_dirs 0 _wasi_clang_res)
+        list(APPEND GEN_DATACOPY_ARGS -resource-dir ${_wasi_clang_res})
+      endif()
+    endif()
+  elseif(CMAKE_C_COMPILER MATCHES "arm-none-eabi")
+    # Radio FW: use arm-none-eabi newlib + GCC freestanding headers for libclang.
+    get_filename_component(_arm_bin "${CMAKE_C_COMPILER}" DIRECTORY)
+    get_filename_component(_arm_root "${_arm_bin}" DIRECTORY)
+    set(_arm_inc "${_arm_root}/arm-none-eabi/include")
+    if(EXISTS "${_arm_inc}/inttypes.h")
+      list(APPEND GEN_DATACOPY_ARGS -I${_arm_inc})
+    endif()
+    file(GLOB _gcc_inc_dirs LIST_DIRECTORIES true
+      "${_arm_root}/lib/gcc/arm-none-eabi/*/include")
+    if(_gcc_inc_dirs)
+      list(GET _gcc_inc_dirs 0 _gcc_inc)
+      list(APPEND GEN_DATACOPY_ARGS -I${_gcc_inc})
+    endif()
+    # newlib limits.h vs GCC freestanding limits.h redefine ARG_MAX/PATH_MAX
+    list(APPEND GEN_DATACOPY_ARGS -Wno-macro-redefined)
+  endif()
+
+  set(GEN_DATACOPY_CMD
+    ${CMAKE_COMMAND} -E env EDGETX_SKIP_LIBCLANG_BUILTIN=1
+    ${PYTHON_EXECUTABLE} ${GEN_DATACOPY} ${GEN_DATACOPY_ARGS})
+
+  add_custom_command(
+    OUTPUT ${output}
+    COMMAND ${GEN_DATACOPY_CMD} > ${output}
+    DEPENDS ${GEN_DATACOPY_DEPEND} ${CMAKE_BINARY_DIR}/CMakeCache.txt
+    )
+endfunction()
+
+function(AddHardwareDefTarget output)
+
+  AddCompilerFlags(HW_DEF_ARGS)
+
+  set(HW_DEF_SRC ${RADIO_DIRECTORY}/src/targets/${TARGET_DIR}/hal.h)
+
+  separate_arguments(flags UNIX_COMMAND ${CMAKE_CXX_FLAGS})
+  foreach(flag ${flags})
+    set(HW_DEF_ARGS ${HW_DEF_ARGS} ${flag})
+  endforeach()
+
+  set(GEN_HW_DEFS ${CMAKE_CXX_COMPILER} ${HW_DEF_ARGS} -x c++-header -E -dM ${HW_DEF_SRC})
+  # set(GEN_JSON ${PYTHON_EXECUTABLE} ${RADIO_DIRECTORY}/util/hw_defs/generate_hw_def.py)
+  # set(GEN_JSON ${GEN_JSON} -i defines -T ${FLAVOUR} -)
+
+  # add_custom_command(OUTPUT ${output}
+  #   COMMAND ${GEN_HW_DEFS} | ${GEN_JSON} > ${output}
+  #   DEPENDS ${HW_DEF_SRC} ${RADIO_DIRECTORY}/util/hw_defs/generate_hw_def.py
+  # )
+
+  add_custom_command(OUTPUT ${output}.h
+    COMMAND ${GEN_HW_DEFS} > ${output}.h
+    DEPENDS ${HW_DEF_SRC} ${RADIO_DIRECTORY}/util/hw_defs/generate_hw_def.py
+  )
+endfunction()
+
+function(AddHWGenTarget input template output)
+
+  # Script
+  set(GEN_JSON ${PYTHON_EXECUTABLE} ${RADIO_DIRECTORY}/util/hw_defs/generate_hw_def.py)
+
+  # Inputs
+  if(DEFINED EDGE_TX_HW_JSON_PATH)
+    set(INPUT_JSON ${EDGE_TX_HW_JSON_PATH})
+  else()
+    set(INPUT_JSON ${RADIO_SRC_DIR}/boards/hw_defs/${input})
+  endif()
+  set(TEMPLATE ${RADIO_DIRECTORY}/util/hw_defs/${template}.jinja)
+  set(GEN_PY_DEPS
+    ${RADIO_DIRECTORY}/util/hw_defs/generator.py
+    ${RADIO_DIRECTORY}/util/hw_defs/legacy_names.py
+  )
+
+  # Command
+  set(GEN_JSON ${GEN_JSON} -t ${TEMPLATE} -T ${FLAVOUR} ${INPUT_JSON})
+
+  add_custom_command(OUTPUT ${output}
+    COMMAND ${GEN_JSON} > ${output}
+    DEPENDS ${INPUT_JSON} ${TEMPLATE} ${GEN_PY_DEPS} ${CMAKE_BINARY_DIR}/CMakeCache.txt
+  )
+
+  add_custom_target(${template} DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${output})
+endfunction()
+
+macro(AddHeadersSources)
+  foreach(name
+    ${${PROJECT_NAME}_NAMES})
+
+    set(${PROJECT_NAME}_SRCS
+      ${${PROJECT_NAME}_SRCS}
+      ${name}.cpp
+    )
+
+    set(${PROJECT_NAME}_HDRS
+      ${${PROJECT_NAME}_HDRS}
+      ${name}.h
+    )
+  endforeach()
+endmacro()
+
+# Collect all user-specified command-line cache variables into a list
+# suitable for forwarding to ExternalProject or sub-project cmake invocations.
+# Optional EXCLUDE parameter: regex to skip matching variable names.
+function(CollectCommandLineArgs out_var)
+  cmake_parse_arguments(_cla "" "EXCLUDE" "" ${ARGN})
+  set(_args "")
+  get_cmake_property(_cache_vars CACHE_VARIABLES)
+  foreach(_var ${_cache_vars})
+    if(_cla_EXCLUDE AND _var MATCHES "${_cla_EXCLUDE}")
+      continue()
+    endif()
+    get_property(_help CACHE ${_var} PROPERTY HELPSTRING)
+    if(_help STREQUAL "No help, variable specified on the command line.")
+      get_property(_type CACHE ${_var} PROPERTY TYPE)
+      if(_type STREQUAL "UNINITIALIZED")
+        set(_type)
+      else()
+        set(_type :${_type})
+      endif()
+      list(APPEND _args "-D${_var}${_type}=${${_var}}")
+    endif()
+  endforeach()
+  set(${out_var} ${_args} PARENT_SCOPE)
+endfunction()

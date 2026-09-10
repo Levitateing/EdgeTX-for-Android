@@ -1,0 +1,429 @@
+/*
+ * Copyright (C) EdgeTX
+ *
+ * Based on code named
+ *   opentx - https://github.com/opentx/opentx
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "radio_tools.h"
+
+#include <algorithm>
+
+#include "hal/module_port.h"
+#include "lua/lua_api.h"
+#include "edgetx.h"
+#include "radio_ghost_module_config.h"
+#include "radio_spectrum_analyser.h"
+#include "radio_gps_tool.h"
+#include "radio_mic_recorder.h"
+#include "standalone_lua.h"
+#include "etx_lv_theme.h"
+#include "lib_file.h"
+#include "menu.h"
+#if LUA_SCRIPT_LCD_COMPAT
+#include "lua/lua_script_lcd_compat.h"
+#endif
+
+//-----------------------------------------------------------------------------
+
+inline bool tool_compare_nocase(const ToolEntry& first, const ToolEntry& second)
+{
+  return strcasecmp(first.label.c_str(), second.label.c_str()) < 0;
+}
+
+#if defined(LUA)
+std::vector<ToolEntry> luaTools;
+static bool luaToolsLoaded = false;
+
+static void run_lua_tool(const std::string& path)
+{
+  char toolPath[FF_MAX_LFN + 1];
+  strncpy(toolPath, path.c_str(), sizeof(toolPath) - 1);
+  *((char*)getBasename(toolPath) - 1) = '\0';
+  f_chdir(toolPath);
+
+  luaExecStandalone(path.c_str());
+}
+
+void unloadLuaTools()
+{
+  luaTools.clear();
+  luaToolsLoaded = false;
+}
+
+// LUA scripts in TOOLS
+void loadLuaTools()
+{
+  if (!luaToolsLoaded) {
+    luaToolsLoaded = true;
+
+    FILINFO fno;
+    DIR dir;
+
+    FRESULT res = f_opendir(&dir, SCRIPTS_TOOLS_PATH);
+    if (res == FR_OK) {
+      for (;;) {
+        res = f_readdir(&dir, &fno); /* Read a directory item */
+        if (res != FR_OK || fno.fname[0] == 0)
+          break; /* Break on error or end of dir */
+        if (fno.fattrib & (AM_HID | AM_SYS))
+          continue;  // skip hidden files and system files
+        if (fno.fname[0] == '.') continue; /* Ignore UNIX hidden files */
+
+        bool inFolder = (fno.fattrib & AM_DIR);
+
+        char path[FF_MAX_LFN + 1] = SCRIPTS_TOOLS_PATH "/";
+        strcat(path, fno.fname);
+        if (inFolder) {
+          // check if .lua with same name exists - skip folder to avoid duplicate entries
+          auto plen = strlen(path);
+          strcat(path, ".lua");
+          if (f_stat(path, nullptr) == FR_OK)
+            continue;
+          path[plen] = 0;
+          strcat(path, "/main.lua");
+          if (f_stat(path, nullptr) != FR_OK)
+            continue;
+        }
+
+        if (isRadioScriptTool(path)) {
+          char toolName[RADIO_TOOL_NAME_MAXLEN + 1] = {0};
+          const char* label;
+          if (readToolName(toolName, path)) {
+            label = toolName;
+          } else {
+            if (!inFolder) {
+              char* ext = (char*)getFileExtension(fno.fname);
+              if (ext) *ext = '\0';
+            }
+            label = fno.fname;
+          }
+          luaTools.emplace_back(ToolEntry{label, path, run_lua_tool});
+        }
+      }
+    }
+
+  std::sort(luaTools.begin(), luaTools.end(), tool_compare_nocase);
+  }
+}
+
+// LUA scripts in TOOLS
+static void scanLuaTools(std::list<ToolEntry>& scripts)
+{
+  loadLuaTools();
+
+  for (auto t : luaTools)
+    scripts.emplace_back(t);
+}
+#endif
+
+const ToolEntry* getLuaTool(int n)
+{
+  if (n >= 0 && n < (int)luaTools.size())
+    return &luaTools[n];
+  return nullptr;
+}
+
+int getLuaToolId(const std::string name)
+{
+  int id = 0;
+  for (auto t : luaTools) {
+    if (t.label == name)
+      return id;
+    id += 1;
+  }
+  return -1;
+}
+
+void runLuaTool(const std::string name)
+{
+  for (auto t : luaTools) {
+    if (t.label == name) {
+      t.exec(t.path);
+      return;
+    }
+  }
+}
+
+void getLuaToolNames(std::vector<std::string>& nameList)
+{
+  loadLuaTools();
+  std::string s(STR_QM_APPS);
+  s += " - ";
+  for (size_t i = 0; i < luaTools.size(); i += 1) {
+    nameList.emplace_back(s + luaTools[i].label);
+  }
+}
+//-----------------------------------------------------------------------------
+
+static bool isModelGPSSensorPresent()
+{
+  for (int i = 0; i < MAX_TELEMETRY_SENSORS; i++) {
+    if (isGPSSensor(i+1)) return true;
+  }
+  return false;
+}
+
+static void run_gpstool(const std::string&)
+{
+  new RadioGpsTool();
+}
+
+#if defined(PXX2) || defined(MULTIMODULE)
+
+#if defined(HARDWARE_INTERNAL_MODULE)
+static void run_spektrum_int(const std::string&)
+{
+  new RadioSpectrumAnalyser(INTERNAL_MODULE);
+}
+#endif
+
+#if defined(HARDWARE_EXTERNAL_MODULE)
+static void run_spektrum_ext(const std::string&)
+{
+  new RadioSpectrumAnalyser(EXTERNAL_MODULE);
+}
+#endif
+#endif  // defined(PXX2) || defined(MULTIMODULE)
+
+#if defined(INTERNAL_MODULE_PXX2)
+static void run_pxx2_power(const std::string&)
+{
+#if 0  // disabled Power Meter: not yet implemented
+  new RadioPowerMeter(INTERNAL_MODULE);
+#endif
+}
+#endif
+
+#if defined(GHOST)
+static void run_ghost_config(const std::string&)
+{
+  new RadioGhostModuleConfig(EXTERNAL_MODULE);
+}
+#endif
+
+#if defined(PDM_CLOCK)
+static void run_mic_recorder(const std::string&)
+{
+  new RadioMicRecorder();
+}
+#endif
+
+//-----------------------------------------------------------------------------
+
+struct ToolButton : public TextButton {
+  ToolButton(Window* parent, const ToolEntry& tool, bool luaTool = false) :
+      TextButton(parent, rect_t{}, tool.label, [=]() {
+        tool.exec(tool.path);
+        return 0;
+      })
+  {
+    setWidth(TOOLS_BTN_W);
+    setHeight(TOOLS_BTN_H);
+
+    lv_obj_set_width(label, lv_pct(100));
+    etx_obj_add_style(label, styles->text_align_center, LV_PART_MAIN);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+
+#if LUA_SCRIPT_LCD_COMPAT
+    if (luaTool) {
+      const std::string toolPath = tool.path;
+      const std::string toolLabel = tool.label;
+      setLongPressHandler([=]() {
+        showLuaToolLcdMenu(toolLabel, toolPath);
+        return 0;
+      });
+    }
+#endif
+  }
+
+#if LUA_SCRIPT_LCD_COMPAT
+  static void showLuaToolLcdMenu(const std::string& toolLabel,
+                                 const std::string& toolPath)
+  {
+    struct LcdPreset {
+      coord_t w;
+      coord_t h;
+      const char* label;
+    };
+    static const LcdPreset presets[] = {
+        {800, 480, "800 x 480"},
+        {480, 320, "480 x 320"},
+    };
+
+    auto* menu = new Menu();
+    menu->setTitle(toolLabel + " LCD");
+
+    for (const auto& preset : presets) {
+      menu->addLine(
+          preset.label,
+          [=]() {
+            luaScriptCompatLcdSetForTool(toolPath.c_str(), preset.w, preset.h);
+            menu->deleteLater();
+          },
+          [=]() {
+            coord_t curW = 800;
+            coord_t curH = 480;
+            luaScriptCompatLcdGetForTool(toolPath.c_str(), &curW, &curH);
+            return curW == preset.w && curH == preset.h;
+          });
+    }
+  }
+#endif
+
+  static LAYOUT_ORIENTATION(TOOLS_BTN_W, (LCD_W - PAD_LARGE * 3) / 3, (LCD_W - PAD_LARGE * 2) / 2)
+  static LAYOUT_VAL_SCALED(TOOLS_BTN_H, 48)
+};
+
+//-----------------------------------------------------------------------------
+
+RadioToolsPage::RadioToolsPage(const PageDef& pageDef) : PageGroupItem(pageDef) {}
+
+void RadioToolsPage::build(Window* window)
+{
+  this->window = window;
+
+  memclear(&reusableBuffer.radioTools, sizeof(reusableBuffer.radioTools));
+  waiting = 0;
+
+#if defined(PXX2)
+  for (uint8_t module = 0; module < NUM_MODULES; module++) {
+    if (isModulePXX2(module) &&
+        (module == INTERNAL_MODULE ? modulePortPowered(INTERNAL_MODULE)
+                                   : modulePortPowered(EXTERNAL_MODULE))) {
+      waiting |= (1 << module);
+      moduleState[module].readModuleInformation(
+          &reusableBuffer.radioTools.modules[module], PXX2_HW_INFO_TX_ID,
+          PXX2_HW_INFO_TX_ID);
+    }
+  }
+#endif
+
+  rebuild(window);
+}
+
+void RadioToolsPage::checkEvents()
+{
+#if defined(PXX2)
+  bool refresh = false;
+
+  for (uint8_t module = 0; module < NUM_MODULES; module++) {
+    if ((waiting & (1 << module)) &&
+        reusableBuffer.radioTools.modules[module].information.modelID) {
+      waiting &= ~(1 << module);
+      refresh = true;
+    }
+  }
+
+  if (refresh) {
+    rebuild(window);
+  }
+#endif
+
+  PageGroupItem::checkEvents();
+}
+
+void RadioToolsPage::rebuild(Window* window)
+{
+  window->clear();
+
+  std::list<ToolEntry> tools;
+
+#if defined(HARDWARE_INTERNAL_MODULE)
+  bool intSpecAnalyser = false;
+#endif
+#if defined(HARDWARE_EXTERNAL_MODULE)
+  bool extSpecAnalyser = false;
+#endif
+
+#if defined(PXX2)
+  auto hwSettings = &reusableBuffer.hardwareAndSettings;
+
+#if defined(INTERNAL_MODULE_PXX2)
+  auto intHwSettings = &hwSettings->modules[INTERNAL_MODULE];
+  // PXX2 modules tools
+  if (isPXX2ModuleOptionAvailable(intHwSettings->information.modelID,
+                                  MODULE_OPTION_SPECTRUM_ANALYSER)) {
+    intSpecAnalyser = true;
+  }
+  if (isPXX2ModuleOptionAvailable(intHwSettings->information.modelID,
+                                  MODULE_OPTION_POWER_METER)) {
+    tools.emplace_back(ToolEntry{STR_POWER_METER_INT, {}, run_pxx2_power});
+  }
+#endif
+
+#if defined(HARDWARE_EXTERNAL_MODULE)
+  auto extHwSettings = &hwSettings->modules[EXTERNAL_MODULE];
+  if (isPXX2ModuleOptionAvailable(extHwSettings->information.modelID,
+                                  MODULE_OPTION_SPECTRUM_ANALYSER)) {
+    extSpecAnalyser = true;
+  }
+#endif
+#endif  // defined(PXX2)
+
+#if defined(HARDWARE_INTERNAL_MODULE) && defined(MULTIMODULE)
+  if (g_eeGeneral.internalModule == MODULE_TYPE_MULTIMODULE) {
+    intSpecAnalyser = true;
+  }
+#endif
+
+#if defined(HARDWARE_EXTERNAL_MODULE) && (defined(PXX2) || defined(MULTIMODULE))
+  if (isModuleMultimodule(EXTERNAL_MODULE)) {
+    extSpecAnalyser = true;
+  }
+#endif
+
+  if (isModelGPSSensorPresent())
+    tools.emplace_back(ToolEntry{STR_GPS_MODEL_LOCATOR, "", run_gpstool});
+
+#if defined(HARDWARE_INTERNAL_MODULE)
+  if (intSpecAnalyser)
+    tools.emplace_back(ToolEntry{STR_SPECTRUM_ANALYSER_INT, "", run_spektrum_int});
+#endif
+
+#if defined(HARDWARE_EXTERNAL_MODULE)
+  if (extSpecAnalyser)
+    tools.emplace_back(ToolEntry{STR_SPECTRUM_ANALYSER_EXT, "", run_spektrum_ext});
+#endif
+
+#if defined(GHOST)
+  if (isModuleGhost(EXTERNAL_MODULE)) {
+    tools.emplace_back(ToolEntry{STR_GHOST_MODULE_CONFIG, "", run_ghost_config});
+  }
+#endif
+
+#if defined(PDM_CLOCK)
+  tools.emplace_back(ToolEntry{STR_MIC_RECORDER, "", run_mic_recorder});
+#endif
+
+#if defined(LUA)
+  scanLuaTools(tools);
+#endif
+
+  tools.sort(tool_compare_nocase);
+
+  window->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
+
+  for (const auto& tool : tools) {
+#if LUA_SCRIPT_LCD_COMPAT
+    const bool luaTool = tool.exec == run_lua_tool;
+    new ToolButton(window, tool, luaTool);
+#else
+    new ToolButton(window, tool);
+#endif
+  }
+}

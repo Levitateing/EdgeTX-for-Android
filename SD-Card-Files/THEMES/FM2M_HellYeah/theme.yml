@@ -1,0 +1,19 @@
+---
+summary: 
+   name: "FM2M Hell Yeah!"
+   author: "JimB40"
+   info: "Little devil inside my plane."
+colors: 
+   PRIMARY1: 0x200000
+   PRIMARY2: 0xF0F4F0
+   PRIMARY3: 0x380000
+   SECONDARY1: 0xD00000
+   SECONDARY2: 0x780000
+   SECONDARY3: 0xA0A4A0
+   FOCUS: 0x303030
+   EDIT: 0x787C78
+   ACTIVE: 0xF80000
+   WARNING: 0x000000
+   DISABLED: 0x000000
+   QM_BG: 0x101010
+   QM_FG: 0xD00000

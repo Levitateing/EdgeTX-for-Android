@@ -1,0 +1,44 @@
+# --- Toolchain (re-download via Build GUI → Install missing) ---
+.tools/
+
+# --- Overlay backup (created during build) ---
+.overlay-backup/
+
+# --- Native / radio firmware CMake trees ---
+build-android-arm64/
+build-android-x86_64/
+build-radio-*/
+build-*/
+
+# --- Generated display assets (created on first EDGE_TX_DISPLAY build) ---
+generated/
+
+# --- Gradle / Android Studio ---
+.gradle/
+.kotlin/
+local.properties
+*.iml
+.idea/
+app/build/
+app/.cxx/
+app/src/main/jniLibs/
+
+# --- Build outputs ---
+output/
+*.apk
+*.aab
+*.log
+assemble.log
+
+# --- Python ---
+**/__pycache__/
+*.pyc
+
+# --- OS junk ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# --- Optional local-only ---
+*.user
+*.suo

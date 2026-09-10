@@ -1,0 +1,246 @@
+/*
+ * Copyright (C) EdgeTX
+ *
+ * Based on code named
+ *   opentx - https://github.com/opentx/opentx
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "startup_shutdown.h"
+
+#include "edgetx.h"
+#include "hal/abnormal_reboot.h"
+#include "inactivity_timer.h"
+#include "mainwindow.h"
+#include "os/sleep.h"
+#include "stamp.h"
+#include "theme_manager.h"
+#include "bitmaps.h"
+
+constexpr const char* strip_leading_hyphen(const char* str) {
+    return (str[0] == '-') ? str + 1 : str;
+}
+
+#if defined(VERSION_TAG)
+const std::string ver_str = "" VERSION_TAG;
+const std::string nam_str = "" CODENAME;
+#else
+const std::string ver_str = "" VERSION_PREFIX VERSION;
+const std::string nam_str = strip_leading_hyphen("" VERSION_SUFFIX);
+const std::string git_str = "(" GIT_STR ")";
+#endif
+
+const uint8_t __bmp_splash_logo[] __FLASH = {
+#include "bmp_logo_edgetx_splash.lbm"
+};
+
+static Window* splashScreen = nullptr;
+
+void drawSplash()
+{
+  if (!sdMounted()) sdInit();
+
+  splashScreen = new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  lv_obj_set_parent(splashScreen->getLvObj(), lv_layer_top());
+
+  etx_solid_bg(splashScreen->getLvObj(), COLOR_BLACK_INDEX);
+
+  auto bg = new StaticImage(splashScreen, {0, 0, LCD_W, LCD_H},
+                            BITMAPS_PATH "/" SPLASH_FILE);
+  bg->show(bg->hasImage());
+
+  if (!bg->hasImage()) {
+    LZ4Bitmap* logo = (LZ4Bitmap*)__bmp_splash_logo;
+    coord_t x = (LANDSCAPE ? LCD_W / 3 : LCD_W / 2) - logo->width / 2;
+    coord_t y = (LANDSCAPE ? LCD_H / 2 : LCD_H * 2 / 5) - logo->height / 2;
+    new StaticLZ4Image(splashScreen, x, y, logo);
+
+    coord_t w = LAYOUT_SCALE(200);
+    x = (LANDSCAPE ? LCD_W * 4 / 5 : LCD_W / 2) - w / 2;
+    y = LCD_H - EdgeTxStyles::STD_FONT_HEIGHT * 4;
+    new StaticText(splashScreen, {x, y, w, EdgeTxStyles::STD_FONT_HEIGHT}, ver_str.c_str(), COLOR_GREY_INDEX, CENTERED);
+    new StaticText(splashScreen, {x, y + EdgeTxStyles::STD_FONT_HEIGHT, w, EdgeTxStyles::STD_FONT_HEIGHT},
+                   nam_str.c_str(), COLOR_GREY_INDEX, CENTERED);
+#if !defined(VERSION_TAG)
+    new StaticText(splashScreen, {x, y + EdgeTxStyles::STD_FONT_HEIGHT * 2, w, EdgeTxStyles::STD_FONT_HEIGHT},
+                   git_str.c_str(), COLOR_GREY_INDEX, CENTERED);
+#endif
+  }
+
+  // Refresh to show splash screen
+  MainWindow::instance()->run();
+}
+
+static tmr10ms_t splashStartTime = 0;
+static bool splashRunning = false;
+
+void startSplash()
+{
+  if (!UNEXPECTED_SHUTDOWN()) {
+    splashStartTime = get_tmr10ms();
+    splashRunning = true;
+    drawSplash();
+  }
+}
+
+void cancelSplash()
+{
+  if (splashScreen) {
+    splashScreen->deleteLater();
+    splashScreen = nullptr;
+    splashStartTime = 0;
+  }
+}
+
+void waitSplash()
+{
+  // Handle color splash screen
+  if (splashRunning) {
+    inactivityCheckInputs();
+#if defined(SIMU)
+    // On real hardware, startSplash→waitSplash is short so counting from
+    // first paint works. Under WASM the gap can exceed SPLASH_TIMEOUT, so
+    // the deadline is already past and the logo never appears. Restart the
+    // timer here so the user actually sees the splash (+ hello sound).
+    splashStartTime = get_tmr10ms() + SPLASH_TIMEOUT;
+#else
+    splashStartTime += SPLASH_TIMEOUT;
+#endif
+
+#if defined(PWR_BUTTON_DUAL)
+    // Wait for dual power buttons to be released
+    while (pwrPressed()) {
+      WDG_RESET();
+      sleep_ms(10);
+    }
+    // Kill SYS and/or MDL events
+    killAllEvents();
+    MainWindow::instance()->run();
+#endif
+
+    MainWindow::instance()->blockUntilClose(true, [=]() {
+      if (splashStartTime < get_tmr10ms())
+        return true;
+      auto evt = getEvent();
+      if (evt || inactivityCheckInputs()) {
+        if (evt) killEvents(evt);
+        return true;
+      }
+      return false;
+    });
+
+    // Reset timer so special/global functions set to !1x don't get triggered
+    START_SILENCE_PERIOD();
+  }
+
+  cancelSplash();
+}
+
+static LAYOUT_VAL_SCALED(SHUTDOWN_CIRCLE_RADIUS, 75)
+
+static Window* shutdownWindow = nullptr;
+static StaticIcon* shutdownAnim[4] = {nullptr};
+static BitmapBuffer* shutdownSplashImg = nullptr;
+
+void drawSleepBitmap()
+{
+  if (shutdownWindow) {
+    shutdownWindow->clear();
+  } else {
+    shutdownWindow =
+        new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+    shutdownWindow->setWindowFlag(OPAQUE);
+    etx_solid_bg(shutdownWindow->getLvObj(), COLOR_BLACK_INDEX);
+    lv_obj_move_foreground(shutdownWindow->getLvObj());
+  }
+
+  (new StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
+      ->center(LCD_W, LCD_H);
+
+  lv_refr_now(nullptr);
+}
+
+void cancelShutdownAnimation()
+{
+  if (shutdownWindow) {
+    shutdownWindow->deleteLater();
+    shutdownWindow = nullptr;
+    for (int i = 0; i < 4; i += 1) shutdownAnim[i] = nullptr;
+  }
+}
+
+void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
+                           const char* message)
+{
+  if (totalDuration == 0) return;
+
+  if (shutdownWindow == nullptr) {
+    shutdownWindow =
+        new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+    shutdownWindow->setWindowFlag(OPAQUE);
+    etx_solid_bg(shutdownWindow->getLvObj(), COLOR_BLACK_INDEX);
+    lv_obj_move_foreground(shutdownWindow->getLvObj());
+
+    (void)message;
+    (void)shutdownSplashImg;
+
+    (new StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
+        ->center(LCD_W, LCD_H);
+
+    // Place quarters using the real mask size (matches LAYOUT_SCALE(75) when
+    // assets are correct; still works if scale and PNG disagree).
+    const MaskBitmap* m0 = getBuiltinIcon(ICON_SHUTDOWN_CIRCLE0);
+    const coord_t R = m0 ? (coord_t)m0->width : SHUTDOWN_CIRCLE_RADIUS;
+    const coord_t xo[4] = {0, 0, (coord_t)-R, (coord_t)-R};
+    const coord_t yo[4] = {(coord_t)-R, 0, 0, (coord_t)-R};
+
+    for (int i = 0; i < 4; i += 1) {
+      shutdownAnim[i] = new StaticIcon(
+          shutdownWindow, LCD_W / 2 + xo[i], LCD_H / 2 + yo[i],
+          (EdgeTxIcon)(ICON_SHUTDOWN_CIRCLE0 + i), COLOR_THEME_PRIMARY2_INDEX);
+    }
+  }
+
+  int quarter = 4 - (duration * 5) / totalDuration;
+  if (quarter < 0) quarter = 0;
+  for (int i = 3; i >= quarter; i -= 1) {
+    if (shutdownAnim[i]) shutdownAnim[i]->hide();
+  }
+
+  MainWindow::instance()->run();
+  lv_refr_now(nullptr);
+}
+
+Window* drawFatalErrorScreen(const char* message)
+{
+  auto w = new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  w->setWindowFlag(OPAQUE);
+  etx_solid_bg(w->getLvObj(), COLOR_BLACK_INDEX);
+
+  new StaticText(w, rect_t{0, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, LCD_W, EdgeTxStyles::STD_FONT_HEIGHT * 2},
+                 message, COLOR_WHITE_INDEX, FONT(XL) | CENTERED);
+
+  return w;
+}
+
+void runFatalErrorScreen(const char* message)
+{
+  drawFatalErrorScreen(message);
+
+  MainWindow::instance()->blockUntilClose(true, []() {
+    return false;
+  }, true);
+}

@@ -1,0 +1,367 @@
+/*
+ * Copyright (C) EdgeTX
+ *
+ * Based on code named
+ *   opentx - https://github.com/opentx/opentx
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "widget.h"
+
+#include "edgetx.h"
+#include "messaging.h"
+
+constexpr int16_t OUTPUT_INVALID_VALUE = INT16_MIN;
+constexpr uint8_t OUTPUTS_DEFAULT_LAST_CHANNEL = 16;
+
+#define ETX_STATE_BG_FILL LV_STATE_USER_1
+
+class ChannelValue : public Window
+{
+ public:
+  ChannelValue(Widget* parent, coord_t x, coord_t y, coord_t colWidth,
+               coord_t rowHeight, uint8_t channel, LcdFlags txtColor,
+               LcdFlags barColor) :
+      Window(parent,
+             {x, y, colWidth - 1 + (colWidth & 1), rowHeight}),
+      rowHeight(rowHeight), channel(channel), txtColor(txtColor),
+      barColor(barColor)
+  {
+    setWindowFlag(NO_FOCUS | NO_CLICK);
+
+    refreshMsg.subscribe(Messaging::REFRESH_OUTPUTS_WIDGET, [=](uint32_t param) { refresh(); });
+  
+    delayLoad();
+  }
+
+  void delayedInit() override
+  {
+    etx_obj_add_style(lvobj, styles->border_thin, LV_PART_MAIN);
+    etx_obj_add_style(lvobj, styles->border_color[COLOR_BLACK_INDEX], LV_PART_MAIN);
+
+    padAll(PAD_ZERO);
+
+    bar = lv_obj_create(lvobj);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(bar, 0, rowHeight > 0 ? rowHeight - 1 : 0);
+    etx_bg_color_from_flags(bar, barColor);
+
+    valueLabel = etx_label_create(lvobj, FONT_XS_INDEX);
+    etx_obj_add_style(valueLabel, styles->text_align_right, LV_PART_MAIN);
+    etx_txt_color_from_flags(valueLabel, txtColor);
+    lv_obj_set_width(valueLabel, LV_PCT(100));
+    lv_label_set_text(valueLabel, "");
+
+    chanLabel = etx_label_create(lvobj, FONT_XS_INDEX);
+    etx_obj_add_style(chanLabel, styles->text_align_left, LV_PART_MAIN);
+    etx_txt_color_from_flags(chanLabel, txtColor);
+    lv_label_set_text(chanLabel, "");
+
+    chanHasName = g_model.limitData[channel].name[0] != 0;
+    setChannel();
+
+    if (rowHeight > 0) {
+      divPoints[0] = {(lv_coord_t)(width() / 2), 0};
+      divPoints[1] = {(lv_coord_t)(width() / 2), rowHeight - 1};
+
+      auto divLine = lv_line_create(lvobj);
+      lv_line_set_points(divLine, divPoints, 2);
+      etx_obj_add_style(divLine, styles->div_line, LV_PART_MAIN);
+    }
+
+    refresh();
+  }
+
+  void setChannel()
+  {
+    char s[16];
+    if (chanHasName) {
+      formatNumberAsString(s, 16, channel + 1, LEADING0, 2, "", " ");
+      strAppend(s + 3, g_model.limitData[channel].name, LEN_CHANNEL_NAME);
+    } else {
+      getSourceString(s, MIXSRC_FIRST_CH + channel);
+    }
+    lv_label_set_text(chanLabel, s);
+  }
+
+  void refresh()
+  {
+    if (!loaded || _deleted) return;
+
+    int16_t value = channelOutputs[channel];
+
+    if (value != lastValue || lastExtendedLimits != g_model.extendedLimits) {
+      lastValue = value;
+      lastExtendedLimits = g_model.extendedLimits;
+
+      std::string s;
+      if (g_eeGeneral.ppmunit == PPM_US)
+        s = formatNumberAsString(PPM_CH_CENTER(channel) + value / 2, 0, 0, "", STR_US);
+      else if (g_eeGeneral.ppmunit == PPM_PERCENT_PREC1)
+        s = formatNumberAsString(calcRESXto1000(value), PREC1, 0, "", "%");
+      else
+        s = formatNumberAsString(calcRESXto100(value), 0, 0, "", "%");
+
+      if (s != lastText) {
+        lastText = s;
+        lv_label_set_text(valueLabel, s.c_str());
+      }
+
+      const int lim = (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
+      coord_t w = width();
+      coord_t center = w / 2;
+      int16_t scaledValue =
+          divRoundClosest(w * limit<int16_t>(-lim, value, lim), lim * 2);
+
+      if (scaledValue != lastScaledValue) {
+        lastScaledValue = scaledValue;
+
+        uint16_t fillW = abs(scaledValue);
+        coord_t x = value > 0 ? center : center - fillW;
+
+        lv_obj_set_pos(bar, x, 0);
+        lv_obj_set_size(bar, fillW, rowHeight > 0 ? rowHeight - 1 : 0);
+      }
+    }
+
+    bool hasName = g_model.limitData[channel].name[0] != 0;
+    if (hasName != chanHasName) {
+      chanHasName = hasName;
+      setChannel();
+    }
+  }
+
+ protected:
+  coord_t rowHeight;
+  uint8_t channel;
+  LcdFlags txtColor;
+  LcdFlags barColor;
+  int16_t lastValue = OUTPUT_INVALID_VALUE;
+  int16_t lastScaledValue = OUTPUT_INVALID_VALUE;
+  std::string lastText;
+  bool lastExtendedLimits = false;
+  bool chanHasName = false;
+  lv_obj_t* valueLabel = nullptr;
+  lv_obj_t* chanLabel = nullptr;
+  lv_point_t divPoints[2];
+  lv_obj_t* bar = nullptr;
+  Messaging refreshMsg;
+};
+
+class OutputsWidget : public Widget
+{
+ public:
+  OutputsWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+                int screenNum, int zoneNum) :
+      Widget(factory, parent, rect, screenNum, zoneNum)
+  {
+    padAll(PAD_ZERO);
+
+    etx_obj_add_style(lvobj, styles->bg_opacity_transparent, LV_PART_MAIN);
+    etx_obj_add_style(lvobj, styles->bg_opacity_cover,
+                      LV_PART_MAIN | ETX_STATE_BG_FILL);
+
+    update();
+  }
+
+  void update() override
+  {
+    auto widgetData = getPersistentData();
+
+    // get background color from options[3]
+    etx_bg_color_from_flags(lvobj, widgetData->options[3].value.unsignedValue);
+
+    // Set background opacity from options[2]
+    if (widgetData->options[2].value.boolValue)
+      lv_obj_add_state(lvobj, ETX_STATE_BG_FILL);
+    else
+      lv_obj_clear_state(lvobj, ETX_STATE_BG_FILL);
+
+    if (height() <= SHOW_MIN_H || width() <= SHOW_MIN_W)
+      return;
+
+    bool changed = false;
+
+    // Colors
+    LcdFlags f = widgetData->options[4].value.unsignedValue;
+    if (f != txtColor) { txtColor = f; changed = true; }
+    f = widgetData->options[5].value.unsignedValue;
+    if (f != barColor) { barColor = f; changed = true; }
+
+    // Setup channels (widget options are 1-based channel numbers)
+    uint8_t chan = widgetData->options[0].value.unsignedValue;
+    if (chan != firstChan) { firstChan = chan; changed = true; }
+    chan = widgetData->options[1].value.unsignedValue;
+    if (chan != lastChan) { lastChan = chan; changed = true; }
+
+    // Get size
+    if (width() != lastWidth) { lastWidth = width(); changed = true; }
+    if (height() != lastHeight) { lastHeight = height(); changed = true; }
+
+    uint8_t n = (lastWidth > COLS_MIN_W) ? 2 : 1;
+    if (n != cols) { cols = n; changed = true; }
+
+    LayoutMetrics metrics;
+    computeLayout(metrics);
+
+    if (metrics.baseRowHeight != lastBaseRowHeight) {
+      lastBaseRowHeight = metrics.baseRowHeight;
+      changed = true;
+    }
+    if (metrics.remainder != lastRemainder) {
+      lastRemainder = metrics.remainder;
+      changed = true;
+    }
+    if (metrics.rowCount != rows) {
+      rows = metrics.rowCount;
+      changed = true;
+    }
+
+    if (changed) {
+      clear();
+      coord_t colWidth = lastWidth / cols;
+      uint8_t chan = firstChan;
+      for (uint8_t c = 0; c < cols && chan <= lastChan; c += 1) {
+        for (uint8_t r = 0; r < rows && chan <= lastChan;
+             r += 1, chan += 1) {
+          const coord_t rowHeight =
+              metrics.baseRowHeight + (r < metrics.remainder ? 1 : 0);
+          const coord_t y = r * metrics.baseRowHeight +
+                            min<coord_t>(r, metrics.remainder);
+          new ChannelValue(this, c * colWidth, y, colWidth, rowHeight,
+                           chan - 1, txtColor, barColor);
+        }
+      }
+    }
+  }
+
+  void foreground() override
+  {
+    Messaging::send(Messaging::REFRESH_OUTPUTS_WIDGET);
+  }
+
+  static const WidgetOption options[];
+
+ protected:
+  struct LayoutMetrics {
+    uint8_t rowCount = 0;
+    coord_t baseRowHeight = 0;
+    coord_t remainder = 0;
+  };
+
+  static LAYOUT_VAL_SCALED(MAX_ROW_HEIGHT, 16)
+  static LAYOUT_VAL_SCALED(MIN_ROW_HEIGHT, 12)
+
+  void computeLayout(LayoutMetrics& out) const
+  {
+    out = LayoutMetrics{};
+    if (lastHeight <= 0 || firstChan > lastChan || cols == 0)
+      return;
+
+    const uint8_t channelCount = lastChan - firstChan + 1;
+    uint8_t rowCount = (channelCount + cols - 1) / cols;
+    if (rowCount == 0)
+      return;
+
+    coord_t baseRowHeight = lastHeight / rowCount;
+    coord_t remainder = lastHeight % rowCount;
+
+    if (baseRowHeight > MAX_ROW_HEIGHT) {
+      baseRowHeight = MAX_ROW_HEIGHT;
+      remainder = 0;
+      rowCount = lastHeight / baseRowHeight;
+      const uint8_t maxRows = (channelCount + cols - 1) / cols;
+      if (rowCount > maxRows)
+        rowCount = maxRows;
+      remainder = lastHeight - baseRowHeight * rowCount;
+    } else if (baseRowHeight < MIN_ROW_HEIGHT) {
+      baseRowHeight = MIN_ROW_HEIGHT;
+      remainder = 0;
+      rowCount = lastHeight / baseRowHeight;
+      const uint8_t maxRows = (channelCount + cols - 1) / cols;
+      if (rowCount > maxRows)
+        rowCount = maxRows;
+      remainder = lastHeight - baseRowHeight * rowCount;
+    }
+
+    out.rowCount = rowCount;
+    out.baseRowHeight = baseRowHeight;
+    out.remainder = remainder;
+  }
+
+  coord_t lastWidth = -1;
+  coord_t lastHeight = -1;
+  coord_t lastBaseRowHeight = 0;
+  coord_t lastRemainder = 0;
+  uint8_t firstChan = 255;
+  uint8_t lastChan = 255;
+  uint8_t cols = 0;
+  uint8_t rows = 0;
+  LcdFlags txtColor = 0;
+  LcdFlags barColor = 0;
+
+  static LAYOUT_VAL_SCALED(SHOW_MIN_W, 100)
+  static LAYOUT_VAL_SCALED(SHOW_MIN_H, 20)
+  static LAYOUT_VAL_SCALED(COLS_MIN_W, 300)
+};
+
+const WidgetOption OutputsWidget::options[] = {
+    {STR_FIRST_CHANNEL, WidgetOption::Integer, {1}, {1}, {MAX_OUTPUT_CHANNELS}},
+    {STR_LAST_CHANNEL, WidgetOption::Integer, {OUTPUTS_DEFAULT_LAST_CHANNEL}, {1}, {MAX_OUTPUT_CHANNELS}},
+    {STR_FILL_BACKGROUND, WidgetOption::Bool, false},
+    {STR_BG_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX)},
+    {STR_TEXT_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX)},
+    {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)},
+    {nullptr, WidgetOption::Bool}};
+
+// Note: Must be a template class otherwise the linker will discard the 'outputsWidget' object
+template <class T>
+class OutputsWidgetFactory : public WidgetFactory
+{
+ public:
+  OutputsWidgetFactory(const char* name, const WidgetOption* options,
+                    const char* displayName = nullptr) :
+      WidgetFactory(name, options, displayName)
+  {
+  }
+
+  Widget* createNew(Window* parent, const rect_t& rect,
+                 int screenNum, int zoneNum) const override
+  {
+    return new T(this, parent, rect, screenNum, zoneNum);
+  }
+
+  // Fix the options loaded from the model file to account for
+  // addition of the 'last channel' option
+  const void checkOptions(int screenNum, int zoneNum) const override
+  {
+    auto widgetData = g_model.getWidgetData(screenNum, zoneNum);
+    if (widgetData && widgetData->options.size() >= 2 &&
+        widgetData->options.size() < 6 &&
+        widgetData->options[1].type == WOV_Bool) {
+      WidgetOptionValueTyped v;
+      v.type = WOV_Signed;
+      v.value.signedValue = OUTPUTS_DEFAULT_LAST_CHANNEL;
+      widgetData->options.insert(widgetData->options.begin() + 1, v);
+      storageDirty(EE_MODEL);
+    }
+  }
+};
+
+OutputsWidgetFactory<OutputsWidget> outputsWidget("Outputs",
+                                               OutputsWidget::options,
+                                               STR_WIDGET_OUTPUTS);

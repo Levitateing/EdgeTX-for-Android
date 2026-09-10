@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Broad CDC/ACM filter; EdgeTX VCP often uses ST Micro VID or custom. -->
+<resources>
+    <usb-device class="2" subclass="2" protocol="1" />
+    <!-- STMicroelectronics -->
+    <usb-device vendor-id="1155" />
+    <!-- OpenTX / EdgeTX historical -->
+    <usb-device vendor-id="1204" />
+</resources>
